@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
+# Get SECRET from env
 secret = os.getenv("SECRET")
 
 # Create Blueprint for test routes
