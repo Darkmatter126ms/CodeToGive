@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LandingPage from '../views/LandingPage.vue'
 import ViewCampaigns from '@/views/ViewCampaigns.vue'
+import EditCampaigns from '@/views/EditCampaigns.vue'
 
 
 const router = createRouter({
@@ -21,6 +22,11 @@ const router = createRouter({
       path: '/viewcampaigns',
       name: 'viewcampaigns',
       component: ViewCampaigns
+    },
+    {
+      path: '/editcampaigns',
+      name: 'editacampaigns',
+      component: EditCampaigns
     },
     {
       path: '/about',
