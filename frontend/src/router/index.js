@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LandingPage from '../views/LandingPage.vue'
+import ViewCampaigns from '@/views/ViewCampaigns.vue'
 
 
 const router = createRouter({
@@ -15,6 +16,11 @@ const router = createRouter({
       path: '/',
       name: 'landing',
       component: LandingPage
+    },
+    {
+      path: '/viewcampaigns',
+      name: 'viewcampaigns',
+      component: ViewCampaigns
     },
     {
       path: '/about',

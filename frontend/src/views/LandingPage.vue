@@ -17,8 +17,8 @@ function donate(){
   class="hero-photo tint-dark text-white"
   style="--hero-bg:url('https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=2000')"
 >
-  <div class="container py-20 md:py-28">
-    <div class="max-w-3xl animate-slide-up">
+  <div class="container py-20 md:py-28 flex justify-center">
+    <div class="max-w-3xl mx-auto animate-slide-up">
       <span class="trust-badge mb-6 inline-block">Registered Children’s Charity · Since 2012</span>
       <h1 class="hero-title">
         Give every child a <span class="text-gradient">brighter start</span>
