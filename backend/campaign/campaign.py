@@ -1,5 +1,3 @@
-
-from datetime import datetime
 import os
 from flask import Blueprint, Flask, jsonify, request
 from flask_cors import CORS
@@ -20,10 +18,6 @@ CORS(app)
 
 # Create Blueprint for campaign routes
 campaign_blueprint = Blueprint("campaign", __name__)
-
-# Create and configure Flask app
-app = Flask(__name__)
-CORS(app)
 
 # Health Check
 @campaign_blueprint.route('/health', methods=['GET'])

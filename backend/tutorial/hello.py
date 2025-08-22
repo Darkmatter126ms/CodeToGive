@@ -1,5 +1,3 @@
-
-from datetime import datetime
 import os
 from flask import Blueprint, Flask, jsonify
 from flask_cors import CORS
