@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import LandingPage from '../views/LandingPage.vue'
 import ViewCampaigns from '@/views/ViewCampaigns.vue'
 import EditCampaigns from '@/views/EditCampaigns.vue'
+import PaymentPage from '@/views/PaymentPage.vue'
 
 
 const router = createRouter({
@@ -27,6 +28,11 @@ const router = createRouter({
       path: '/editcampaigns',
       name: 'editacampaigns',
       component: EditCampaigns
+    },
+    {
+      path: '/payment',
+      name: 'payment',
+      component: PaymentPage
     },
     {
       path: '/about',
