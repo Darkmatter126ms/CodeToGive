@@ -31,7 +31,6 @@ def create_donor():
     response = supabase.table("Donors").insert({
         "name": data.get("name"),
         "email": data.get("email"),
-        "donation_type": data.get("donation_type"),
     }).execute()
     if response.data:
         return jsonify({"status": "success", "data": response.data}), 201
@@ -63,7 +62,6 @@ def update_donor(donor_id):
     response = supabase.table("Donors").update({
         "name": data.get("name"),
         "email": data.get("email"),
-        "donation_type": data.get("donation_type"),
     }).eq("donor_id", donor_id).execute()
     if response.data:
         return jsonify({"status": "success", "data": response.data}), 200
@@ -82,4 +80,4 @@ def delete_donor(donor_id):
 app.register_blueprint(donor_blueprint, url_prefix='/donor')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8083)
+    app.run(host='0.0.0.0', port=8081)

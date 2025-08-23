@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Thank you for supporting {{ campaign_name }}!</title>
+    <style>
+      /* Email-safe styles */
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 8px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: bold;
+        margin: 8px 4px;
+      }
+      .btn-share {
+        background: #10b981;
+      }
+      .btn-secondary {
+        background: #6b7280;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 24px;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        color: #111827;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #f97316, #ea580c);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        margin: 8px 0;
+      }
+      .impact-stat {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px 0;
+        text-align: center;
+      }
+      .progress-bar {
+        background: #e5e7eb;
+        border-radius: 10px;
+        height: 20px;
+        overflow: hidden;
+        margin: 12px 0;
+      }
+      .progress-fill {
+        background: linear-gradient(90deg, #10b981, #059669);
+        height: 100%;
+        border-radius: 10px;
+      }
+      .school-info {
+        background: #fefce8;
+        border: 1px solid #fde047;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <!-- REACH Logo -->
+      <p>
+        <img
+          src="cid:reach-logo"
+          alt="REACH Impact Hub"
+          width="140"
+          style="display: block; margin-bottom: 20px"
+        />
+      </p>
+
+      <!-- Main Thank You Message -->
+      <h2>Thank you, {{ donor_name }}!</h2>
+      <p>
+        Your generous <strong>${{ donation_amount }}</strong> donation to
+        <em>{{ campaign_name }}</em> is making a real difference!
+      </p>
+
+      <!-- Badge Earned (if applicable) -->
+      {% if badge_earned %}
+      <div style="text-align: center; margin: 20px 0">
+        <h3>🏆 You've earned a new badge!</h3>
+        <div class="badge">{{ badge_earned }}</div>
+        <p>
+          <em
+            >You're now part of an exclusive group of {{ badge_earned }}
+            supporters!</em
+          >
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- School/Campaign Info -->
+      <div class="school-info">
+        <h3>📚 About {{ campaign_name }}</h3>
+        <p>{{ campaign_description }}</p>
+        <p><strong>School:</strong> {{ school_name }}</p>
+        <p>
+          <strong>Students Impacted:</strong> {{ students_impacted }} children
+        </p>
+      </div>
+
+      <!-- Impact Visualization -->
+      <div class="impact-stat">
+        <h3>Your Impact</h3>
+        <p>
+          <strong>${{ donation_amount }}</strong> =
+          <strong>{{ impact_description }}</strong>
+        </p>
+        <p style="font-size: 14px; color: #6b7280">
+          {{ specific_impact_example }}
+        </p>
+      </div>
+
+      <!-- Campaign Progress -->
+      <h3>📊 Campaign Progress</h3>
+      <p>
+        <strong>${{ current_amount }}</strong> raised of
+        <strong>${{ goal_amount }}</strong> goal
+      </p>
+      <div class="progress-bar">
+        <div
+          class="progress-fill"
+          style="width: {{ progress_percentage }} %"
+        ></div>
+      </div>
+      <p style="font-size: 14px; color: #6b7280">
+        {{ progress_percentage }}% complete • {{ donors_count }} generous
+        educators like you
+      </p>
+
+      <!-- Call to Action Buttons -->
+      <div style="text-align: center; margin: 24px 0">
+        <h3>📢 Share Your Impact!</h3>
+        <p>
+          Help us reach more educators who care about these amazing students:
+        </p>
+
+        <!-- Share Buttons -->
+        <a class="btn btn-share" href="{{ facebook_share_url }}"
+          >📘 Share on Facebook</a
+        >
+      </div>
+    </div>
+  </body>
+</html>
