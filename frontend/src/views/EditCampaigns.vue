@@ -622,7 +622,10 @@ onMounted(() => {
   </div>
 
   <!-- HEADER -->
-  <header class="hero-gradient hero-pattern">
+    <header
+    class="hero-photo tint-dark text-white"
+    style="--hero-bg:url('https://st2.depositphotos.com/1930953/7447/i/950/depositphotos_74478231-stock-photo-asian-children-playing-with-magnifier.jpg')"
+    >
     <div class="container py-20 md:py-28">
       <div class="max-w-4xl mx-auto text-center animate-slide-up">
         <span class="trust-badge mb-6 inline-block">Campaign Management</span>
