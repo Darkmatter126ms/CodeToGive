@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import LandingPage from '../views/LandingPage.vue'
 import ViewCampaigns from '@/views/ViewCampaigns.vue'
 import EditCampaigns from '@/views/EditCampaigns.vue'
+import Leaderboard from '@/views/Leaderboard.vue'
 
 
 const router = createRouter({
@@ -27,6 +28,11 @@ const router = createRouter({
       path: '/editcampaigns',
       name: 'editacampaigns',
       component: EditCampaigns
+    },
+    {
+      path: '/leaderboard',
+      name: 'leaderboard',
+      component: Leaderboard
     },
     {
       path: '/about',
