@@ -78,8 +78,7 @@ def create_payment_intent():
             # Create new donor
             new_donor = supabase.table("Donors").insert({
                 "name": donor_name,
-                "email": donor_email,
-                "donation_type": "one_time"
+                "email": donor_email
             }).execute()
             donor = new_donor.data[0] if new_donor.data else None
     
@@ -126,20 +125,7 @@ def create_subscription():
         
     plan = SUBSCRIPTION_PLANS[plan_id]
     
-    # Create or get donor in database
-    existing_donor = supabase.table("Donors").select("*").eq("email", customer_email).execute()
-    if existing_donor.data:
-        donor = existing_donor.data[0]
-    else:
-        # Create new donor
-        new_donor = supabase.table("Donors").insert({
-            "name": customer_name,
-            "email": customer_email,
-            "donation_type": "subscription"
-        }).execute()
-        donor = new_donor.data[0] if new_donor.data else None
-    
-    # Create or get Stripe customer
+    # Create or get Stripe customer (no donor table involvement)
     customers = stripe.Customer.list(email=customer_email, limit=1)
     if customers.data:
         customer = customers.data[0]
@@ -148,12 +134,6 @@ def create_subscription():
             email=customer_email,
             name=customer_name
         )
-    
-    # Update donor with Stripe customer ID
-    if donor:
-        supabase.table("Donors").update({
-            "stripe_customer_id": customer.id
-        }).eq("donor_id", donor['donor_id']).execute()
     
     # Create price object (if doesn't exist)
     price = stripe.Price.create(
@@ -166,46 +146,95 @@ def create_subscription():
     )
     
     # Create subscription
+    # Option 1: Incomplete subscription (requires frontend payment confirmation)
     subscription = stripe.Subscription.create(
         customer=customer.id,
         items=[{'price': price.id}],
-        payment_behavior='default_incomplete',
+        payment_behavior='default_incomplete',  # Customer will provide payment method later
         expand=['latest_invoice.payment_intent'],
         metadata={
             'plan_id': plan_id,
             'plan_name': plan['name'],
-            'donor_id': str(donor['donor_id']) if donor else ''
+            'customer_email': customer_email,
+            'customer_name': customer_name
         }
     )
     
-    # Save subscription to database
-    if donor:
-        subscription_data = {
-            "donor_id": donor['donor_id'],
-            "plan_id": plan_id,
-            "stripe_subscription_id": subscription.id,
-            "status": subscription.status,
-            "current_period_start": subscription.current_period_start,
-            "current_period_end": subscription.current_period_end
-        }
-        create_subscription_with_updates(subscription_data)
+    # Alternative Option 2: If you want immediate subscription without client_secret
+    # (Uncomment this and comment above if you don't want payment confirmation step)
+    # subscription = stripe.Subscription.create(
+    #     customer=customer.id,
+    #     items=[{'price': price.id}],
+    #     payment_behavior='allow_incomplete',  # Creates active subscription immediately
+    #     metadata={
+    #         'plan_id': plan_id,
+    #         'plan_name': plan['name'],
+    #         'customer_email': customer_email,
+    #         'customer_name': customer_name
+    #     }
+    # )
+    
+    # Save subscription to database (without donor relationship)
+    subscription_data = {
+        "plan_id": plan_id,
+        "stripe_subscription_id": subscription.id,
+        "status": subscription.status,
+        "current_period_start": subscription.get('current_period_start'),
+        "current_period_end": subscription.get('current_period_end'),
+        "customer_email": customer_email,
+        "customer_name": customer_name
+    }
+    
+    try:
+        supabase.table("DonorSubscriptions").insert(subscription_data).execute()
+    except Exception as e:
+        print(f"Warning: Could not save subscription to database: {e}")
+    
+    # Safely get client_secret if available
+    client_secret = None
+    if hasattr(subscription, 'latest_invoice') and subscription.latest_invoice:
+        if hasattr(subscription.latest_invoice, 'payment_intent') and subscription.latest_invoice.payment_intent:
+            client_secret = subscription.latest_invoice.payment_intent.client_secret
     
     return jsonify({
         'subscription_id': subscription.id,
-        'client_secret': subscription.latest_invoice.payment_intent.client_secret,
+        'client_secret': client_secret,
         'customer_id': customer.id,
-        'donor_id': donor['donor_id'] if donor else None
+        'customer_email': customer_email,
+        'status': subscription.status
     }), 200
 
 # Get subscription status
 @payment_blueprint.route('/subscription-status/<subscription_id>', methods=['GET'])
 def get_subscription_status(subscription_id):
     subscription = stripe.Subscription.retrieve(subscription_id)
+    # Safely get amount from subscription items
+    amount = None
+    if hasattr(subscription, 'items') and subscription.items:
+        # subscription.items is a StripeList object, access the data properly
+        try:
+            items_data = subscription.items.data if hasattr(subscription.items, 'data') else list(subscription.items)
+            if items_data and len(items_data) > 0:
+                first_item = items_data[0]
+                if hasattr(first_item, 'price') and hasattr(first_item.price, 'unit_amount'):
+                    amount = first_item.price.unit_amount
+        except (AttributeError, TypeError):
+            # Fallback: try to iterate directly
+            try:
+                for item in subscription.items:
+                    if hasattr(item, 'price') and hasattr(item.price, 'unit_amount'):
+                        amount = item.price.unit_amount
+                        break
+            except (AttributeError, TypeError):
+                amount = None
+    
     return jsonify({
         'status': subscription.status,
-        'current_period_end': subscription.current_period_end,
+        'current_period_end': subscription.get('current_period_end'),
+        'current_period_start': subscription.get('current_period_start'),
         'plan_id': subscription.metadata.get('plan_id'),
-        'amount': subscription.items.data[0].price.unit_amount
+        'amount': amount,
+        'cancel_at_period_end': subscription.get('cancel_at_period_end', False)
     }), 200
 
 # Cancel subscription
@@ -217,21 +246,19 @@ def cancel_subscription(subscription_id):
         cancel_at_period_end=True
     )
     
-    # Update subscription in database
-    subscription_update = supabase.table("donor_subscriptions").update({
-        "cancel_at_period_end": True,
-        "status": "cancelled" if subscription.status == "canceled" else subscription.status
-    }).eq("stripe_subscription_id", subscription_id).execute()
-    
-    # Update donor subscription status
-    if subscription_update.data:
-        db_subscription = subscription_update.data[0]
-        update_donor_subscription_status(db_subscription['donor_id'])
+    # Update subscription in database (no donor involvement)
+    try:
+        subscription_update = supabase.table("DonorSubscriptions").update({
+            "cancel_at_period_end": True,
+            "status": "cancelled" if subscription.status == "canceled" else subscription.status
+        }).eq("stripe_subscription_id", subscription_id).execute()
+    except Exception as e:
+        print(f"Warning: Could not update subscription in database: {e}")
     
     return jsonify({
         'status': 'cancelled',
-        'cancel_at_period_end': subscription.cancel_at_period_end,
-        'current_period_end': subscription.current_period_end
+        'cancel_at_period_end': subscription.get('cancel_at_period_end', False),
+        'current_period_end': subscription.get('current_period_end')
     }), 200
 
 # Webhook handling
@@ -266,26 +293,8 @@ def stripe_webhook():
         subscription_id = invoice['subscription']
         print(f"Subscription {subscription_id} payment succeeded!")
         
-        # Get subscription details
-        subscription = stripe.Subscription.retrieve(subscription_id)
-        donor_id = subscription.metadata.get('donor_id')
-        
-        # Create donation record for subscription payment
-        if donor_id:
-            donation_data = {
-                "donor_id": int(donor_id),
-                "amount": invoice['amount_paid'] / 100,  # Convert cents to dollars
-                "stripe_payment_intent_id": invoice['payment_intent'],
-                "payment_type": "subscription",
-                "payment": "completed"
-            }
-            
-            # Find subscription in database and link it
-            db_subscription = supabase.table("donor_subscriptions").select("subscription_id").eq("stripe_subscription_id", subscription_id).execute()
-            if db_subscription.data:
-                donation_data["subscription_id"] = db_subscription.data[0]['subscription_id']
-            
-            create_donation_with_updates(donation_data)
+        # Just log the successful payment - no donor/donation record needed
+        print(f"Payment amount: ${invoice['amount_paid']/100}")
         
     elif event['type'] == 'customer.subscription.created':
         subscription = event['data']['object']
@@ -296,32 +305,28 @@ def stripe_webhook():
         subscription = event['data']['object']
         print(f"Subscription {subscription['id']} updated!")
         
-        # Update subscription status in database
-        subscription_update = supabase.table("donor_subscriptions").update({
-            "status": subscription['status'],
-            "current_period_start": subscription['current_period_start'],
-            "current_period_end": subscription['current_period_end'],
-            "cancel_at_period_end": subscription.get('cancel_at_period_end', False)
-        }).eq("stripe_subscription_id", subscription['id']).execute()
-        
-        # Update donor subscription status
-        if subscription_update.data:
-            db_subscription = subscription_update.data[0]
-            update_donor_subscription_status(db_subscription['donor_id'])
+        # Update subscription status in database (no donor involvement)
+        try:
+            subscription_update = supabase.table("DonorSubscriptions").update({
+                "status": subscription['status'],
+                "current_period_start": subscription.get('current_period_start'),
+                "current_period_end": subscription.get('current_period_end'),
+                "cancel_at_period_end": subscription.get('cancel_at_period_end', False)
+            }).eq("stripe_subscription_id", subscription['id']).execute()
+        except Exception as e:
+            print(f"Warning: Could not update subscription: {e}")
             
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']
         print(f"Subscription {subscription['id']} cancelled!")
         
-        # Update subscription status to cancelled
-        subscription_update = supabase.table("donor_subscriptions").update({
-            "status": "cancelled"
-        }).eq("stripe_subscription_id", subscription['id']).execute()
-        
-        # Update donor subscription status
-        if subscription_update.data:
-            db_subscription = subscription_update.data[0]
-            update_donor_subscription_status(db_subscription['donor_id'])
+        # Update subscription status to cancelled (no donor involvement)
+        try:
+            subscription_update = supabase.table("DonorSubscriptions").update({
+                "status": "cancelled"
+            }).eq("stripe_subscription_id", subscription['id']).execute()
+        except Exception as e:
+            print(f"Warning: Could not update cancelled subscription: {e}")
         
     return jsonify({'status': 'success'}), 200
 
@@ -329,6 +334,36 @@ def stripe_webhook():
 @payment_blueprint.route('/plans', methods=['GET'])
 def get_plans():
     return jsonify(SUBSCRIPTION_PLANS), 200
+
+# TEST ENDPOINT - Simulate completed payment (for testing only)
+@payment_blueprint.route('/test-complete-payment/<payment_intent_id>', methods=['POST'])
+def test_complete_payment(payment_intent_id):
+    """Test endpoint to simulate payment completion"""
+    try:
+        # For now, just update database without touching Stripe
+        # In production, Stripe webhooks handle this automatically
+        donation_update = supabase.table("Donations").update({
+            "payment": "completed"
+        }).eq("stripe_payment_intent_id", payment_intent_id).execute()
+        
+        if donation_update.data:
+            donation = donation_update.data[0]
+            # Update campaign progress if donation exists
+            if donation.get('campaign_id'):
+                update_campaign_progress(donation['campaign_id'])
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Payment {payment_intent_id} marked as completed in database',
+                'donation_id': donation['donation_id'],
+                'amount': donation['amount'],
+                'note': 'Stripe status remains incomplete (normal for test setup)'
+            }), 200
+        else:
+            return jsonify({'error': 'Payment intent not found in database'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ============================================================================
 # PAYMENT-SPECIFIC DATA ENDPOINTS
@@ -377,7 +412,7 @@ def get_donor_donations(donor_id):
 # Get all active subscriptions
 @payment_blueprint.route('/subscriptions/active', methods=['GET'])
 def get_active_subscriptions():
-    subscriptions_response = supabase.table("donor_subscriptions").select("*, Donors(name, email), subscription_plans(name, price_cents)").eq("status", "active").execute()
+    subscriptions_response = supabase.table("DonorSubscriptions").select("*, SubscriptionPlans(name, price_cents)").eq("status", "active").execute()
     if subscriptions_response.data:
         return jsonify({
             'status': 'success',
@@ -391,10 +426,10 @@ def get_active_subscriptions():
             'total_active_subscriptions': 0
         }), 200
 
-# Get subscription details by donor ID
-@payment_blueprint.route('/donor/<int:donor_id>/subscriptions', methods=['GET'])
-def get_donor_subscriptions(donor_id):
-    subscriptions_response = supabase.table("donor_subscriptions").select("*, subscription_plans(name, price_cents, features)").eq("donor_id", donor_id).execute()
+# Get subscription details by email
+@payment_blueprint.route('/subscriptions/email/<email>', methods=['GET'])
+def get_subscriptions_by_email(email):
+    subscriptions_response = supabase.table("DonorSubscriptions").select("*, SubscriptionPlans(name, price_cents, features)").eq("customer_email", email).execute()
     if subscriptions_response.data:
         return jsonify({
             'status': 'success',
@@ -415,12 +450,11 @@ def get_payment_stats():
     total_donations_count = len(total_donations_response.data) if total_donations_response.data else 0
     
     # Get active subscriptions
-    active_subs_response = supabase.table("donor_subscriptions").select("*, subscription_plans(price_cents)").eq("status", "active").execute()
-    monthly_recurring = sum(s['subscription_plans']['price_cents'] / 100 for s in active_subs_response.data) if active_subs_response.data else 0
+    active_subs_response = supabase.table("DonorSubscriptions").select("*, SubscriptionPlans(price_cents)").eq("status", "active").execute()
+    monthly_recurring = sum(s['SubscriptionPlans']['price_cents'] / 100 for s in active_subs_response.data) if active_subs_response.data else 0
     
-    # Get total donors
-    total_donors_response = supabase.table("Donors").select("donor_id").execute()
-    total_donors = len(total_donors_response.data) if total_donors_response.data else 0
+    # Get total unique subscription customers
+    total_subscribers = len(active_subs_response.data) if active_subs_response.data else 0
     
     # Get total campaigns
     total_campaigns_response = supabase.table("Campaigns").select("campaign_id").execute()
@@ -433,7 +467,7 @@ def get_payment_stats():
             'total_donations_count': total_donations_count,
             'monthly_recurring_revenue': monthly_recurring,
             'active_subscriptions': len(active_subs_response.data) if active_subs_response.data else 0,
-            'total_donors': total_donors,
+            'total_subscribers': total_subscribers,
             'total_campaigns': total_campaigns
         }
     }), 200

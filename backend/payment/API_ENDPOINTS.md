@@ -1,114 +1,132 @@
-# Payment API Endpoints Documentation
+# Payment API - Postman Collection
 
-This document describes all available endpoints in the updated payment system with database integration.
+**Base URL:** `http://localhost:8084/payment`
 
-## Base URL
-```
-http://localhost:8084/payment
-```
+## 🚀 Quick Setup for Postman
 
-## 🔐 Authentication & Setup Endpoints
-
-### Health Check
-```
-GET /health
-```
-**Response:** Service status
-```json
-{"status": "payment service alive"}
-```
-
-### Get Subscription Plans
-```
-GET /plans
-```
-**Response:** Available subscription tiers
-```json
-{
-  "supporter": {"name": "Supporter", "price": 6000, "currency": "usd", "interval": "month"},
-  "advocate": {"name": "Advocate", "price": 12000, "currency": "usd", "interval": "month"},
-  "champion": {"name": "Champion", "price": 50000, "currency": "usd", "interval": "month"}
-}
-```
+1. Create a new Collection named "Payment API"
+2. Set Collection Variables:
+   - `base_url`: `http://localhost:8084/payment`
+   - `donor_email`: `test@example.com` 
+   - `donor_name`: `Test User`
 
 ---
 
-## 💳 Payment Processing Endpoints
+## 📋 API Endpoints
 
-### Create Payment Intent (One-time Donation)
+### 1. Health Check
 ```
-POST /create-payment-intent
-```
-**Request Body:**
-```json
+Method: GET
+URL: {{base_url}}/health
+Headers: None required
+
+Expected Response (200):
 {
-  "amount": 5000,           // Amount in cents ($50.00)
-  "currency": "usd",        // Optional, defaults to "usd"
-  "email": "user@example.com",
-  "name": "John Doe",       // Optional
-  "campaign_id": 1          // Optional, for campaign donations
+  "status": "payment service alive"
 }
 ```
-**Response:**
-```json
+
+### 2. Get Subscription Plans
+```
+Method: GET
+URL: {{base_url}}/plans
+Headers: None required
+
+Expected Response (200):
+{
+  "supporter": {
+    "name": "Supporter",
+    "price": 6000,
+    "currency": "usd", 
+    "interval": "month"
+  },
+  "advocate": {
+    "name": "Advocate",
+    "price": 12000,
+    "currency": "usd",
+    "interval": "month"
+  },
+  "champion": {
+    "name": "Champion", 
+    "price": 50000,
+    "currency": "usd",
+    "interval": "month"
+  }
+}
+```
+
+### 3. Create Payment Intent (One-time Donation)
+```
+Method: POST
+URL: {{base_url}}/create-payment-intent
+Headers:
+  Content-Type: application/json
+
+Request Body (raw JSON):
+{
+  "amount": 5000,
+  "currency": "usd",
+  "email": "{{donor_email}}",
+  "name": "{{donor_name}}",
+  "campaign_id": 1
+}
+
+Expected Response (200):
 {
   "client_secret": "pi_xxx_secret_xxx",
-  "payment_intent_id": "pi_xxxxxxxxxxxxx",
+  "payment_intent_id": "pi_xxxxxxxxxxxxx", 
   "donor_id": 123
 }
 ```
-**Database Actions:**
-- Creates or finds donor by email
-- Saves pending donation to Donations table
-- Links donation to campaign if provided
 
-### Create Subscription
+### 4. Create Subscription
 ```
-POST /create-subscription
-```
-**Request Body:**
-```json
+Method: POST
+URL: {{base_url}}/create-subscription
+Headers:
+  Content-Type: application/json
+
+Request Body (raw JSON):
 {
-  "plan_id": "supporter",    // "supporter", "advocate", or "champion"
-  "email": "user@example.com",
-  "name": "John Doe"
+  "plan_id": "supporter",
+  "email": "{{donor_email}}",
+  "name": "{{donor_name}}"
 }
-```
-**Response:**
-```json
+
+Expected Response (200):
 {
   "subscription_id": "sub_xxxxxxxxxxxxx",
-  "client_secret": "pi_xxx_secret_xxx",
+  "client_secret": "pi_xxx_secret_xxx", 
   "customer_id": "cus_xxxxxxxxxxxxx",
-  "donor_id": 123
+  "customer_email": "test@example.com",
+  "status": "incomplete"
 }
 ```
-**Database Actions:**
-- Creates or finds donor by email
-- Links donor to Stripe customer
-- Saves subscription to donor_subscriptions table
-- Updates donor subscription_status
 
-### Get Subscription Status
+### 5. Get Subscription Status
 ```
-GET /subscription-status/<subscription_id>
-```
-**Response:**
-```json
+Method: GET
+URL: {{base_url}}/subscription-status/sub_xxxxxxxxxxxxx
+Headers: None required
+
+Expected Response (200):
 {
   "status": "active",
   "current_period_end": 1234567890,
+  "current_period_start": 1234567890,
   "plan_id": "supporter",
-  "amount": 6000
+  "amount": 6000,
+  "cancel_at_period_end": false
 }
 ```
 
-### Cancel Subscription
+### 6. Cancel Subscription
 ```
-POST /cancel-subscription/<subscription_id>
-```
-**Response:**
-```json
+Method: POST
+URL: {{base_url}}/cancel-subscription/sub_xxxxxxxxxxxxx
+Headers: None required
+
+Expected Response (200):
 {
   "status": "cancelled",
   "cancel_at_period_end": true,
@@ -116,69 +134,13 @@ POST /cancel-subscription/<subscription_id>
 }
 ```
 
-### Stripe Webhook Handler
+### 7. Get Campaign Donations
 ```
-POST /webhook
-```
-**Purpose:** Handles Stripe events and updates database
-**Handled Events:**
-- `payment_intent.succeeded` - Confirms donations
-- `invoice.payment_succeeded` - Records subscription payments
-- `customer.subscription.updated` - Updates subscription status
-- `customer.subscription.deleted` - Handles cancellations
+Method: GET
+URL: {{base_url}}/campaign/1/donations
+Headers: None required
 
----
-
-## 📊 Data Retrieval Endpoints
-
-### Campaign Information
-
-#### Get Single Campaign
-```
-GET /campaign/<campaign_id>
-```
-**Response:**
-```json
-{
-  "status": "success",
-  "data": {
-    "campaign_id": 1,
-    "name": "Emergency School Meals",
-    "current_amount": 5000.00,
-    "goal_amount": 25000.00,
-    "progress_percentage": 20.0,
-    "status": "active"
-  }
-}
-```
-
-#### Get All Campaigns
-```
-GET /campaigns
-```
-**Response:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "campaign_id": 1,
-      "name": "Emergency School Meals",
-      "current_amount": 5000.00,
-      "goal_amount": 25000.00,
-      "progress_percentage": 20.0,
-      "status": "active"
-    }
-  ]
-}
-```
-
-#### Get Campaign Donations
-```
-GET /campaign/<campaign_id>/donations
-```
-**Response:**
-```json
+Expected Response (200):
 {
   "status": "success",
   "data": [
@@ -186,7 +148,10 @@ GET /campaign/<campaign_id>/donations
       "donation_id": 1,
       "amount": 100.00,
       "donated_at": "2024-01-15T10:30:00Z",
-      "Donors": {"name": "John Doe", "email": "john@example.com"}
+      "Donors": {
+        "name": "John Doe",
+        "email": "john@example.com"
+      }
     }
   ],
   "total_donations": 15,
@@ -194,44 +159,13 @@ GET /campaign/<campaign_id>/donations
 }
 ```
 
-### Donor Information
+### 8. Get Donor Donations
+```
+Method: GET
+URL: {{base_url}}/donor/123/donations
+Headers: None required
 
-#### Get Single Donor
-```
-GET /donor/<donor_id>
-```
-**Response:**
-```json
-{
-  "status": "success",
-  "data": {
-    "donor_id": 123,
-    "name": "John Doe",
-    "email": "john@example.com",
-    "total_donated": 150.00,
-    "subscription_status": "active",
-    "stripe_customer_id": "cus_xxxxxxxxxxxxx",
-    "active_subscription": {
-      "plan_id": "supporter",
-      "status": "active"
-    },
-    "donation_count": 3
-  }
-}
-```
-
-#### Get Donor by Email
-```
-GET /donor/email/<email>
-```
-**Response:** Same as Get Single Donor
-
-#### Get Donor Donations
-```
-GET /donor/<donor_id>/donations
-```
-**Response:**
-```json
+Expected Response (200):
 {
   "status": "success",
   "data": [
@@ -239,7 +173,9 @@ GET /donor/<donor_id>/donations
       "donation_id": 1,
       "amount": 50.00,
       "payment_type": "one_time",
-      "Campaigns": {"name": "Emergency School Meals"}
+      "Campaigns": {
+        "name": "Emergency School Meals"
+      }
     }
   ],
   "total_donations": 3,
@@ -247,12 +183,38 @@ GET /donor/<donor_id>/donations
 }
 ```
 
-#### Get Donor Subscriptions
+### 9. Get Active Subscriptions
 ```
-GET /donor/<donor_id>/subscriptions
+Method: GET
+URL: {{base_url}}/subscriptions/active
+Headers: None required
+
+Expected Response (200):
+{
+  "status": "success",
+  "data": [
+    {
+      "subscription_id": 1,
+      "status": "active",
+      "customer_email": "john@example.com",
+      "customer_name": "John Doe",
+      "SubscriptionPlans": {
+        "name": "Supporter",
+        "price_cents": 6000
+      }
+    }
+  ],
+  "total_active_subscriptions": 5
+}
 ```
-**Response:**
-```json
+
+### 10. Get Subscriptions by Email
+```
+Method: GET
+URL: {{base_url}}/subscriptions/email/test@example.com
+Headers: None required
+
+Expected Response (200):
 {
   "status": "success",
   "data": [
@@ -261,46 +223,25 @@ GET /donor/<donor_id>/subscriptions
       "status": "active",
       "current_period_start": "2024-01-01T00:00:00Z",
       "current_period_end": "2024-02-01T00:00:00Z",
-      "subscription_plans": {
+      "SubscriptionPlans": {
         "name": "Supporter",
         "price_cents": 6000,
-        "features": {"reports": "monthly", "badges": "basic"}
+        "features": {
+          "description": "Monthly impact reports and basic badge collection"
+        }
       }
     }
   ]
 }
 ```
 
-### Subscription Management
+### 11. Get Payment Statistics
+```
+Method: GET
+URL: {{base_url}}/stats
+Headers: None required
 
-#### Get Active Subscriptions
-```
-GET /subscriptions/active
-```
-**Response:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "subscription_id": 1,
-      "status": "active",
-      "Donors": {"name": "John Doe", "email": "john@example.com"},
-      "subscription_plans": {"name": "Supporter", "price_cents": 6000}
-    }
-  ],
-  "total_active_subscriptions": 5
-}
-```
-
-### Analytics
-
-#### Get Payment Statistics
-```
-GET /stats
-```
-**Response:**
-```json
+Expected Response (200):
 {
   "status": "success",
   "data": {
@@ -308,64 +249,91 @@ GET /stats
     "total_donations_count": 45,
     "monthly_recurring_revenue": 1200.00,
     "active_subscriptions": 8,
-    "total_donors": 25,
+    "total_subscribers": 25,
     "total_campaigns": 3
   }
 }
 ```
 
----
+### 12. Test Complete Payment (Development Only)
+```
+Method: POST
+URL: {{base_url}}/test-complete-payment/pi_xxxxxxxxxxxxx
+Headers: None required
 
-## 🗄️ Database Integration
-
-### Tables Used
-
-**Existing Tables (Enhanced):**
-- `Campaigns` - Campaign data with auto-updated current_amount
-- `Donors` - Donor profiles with Stripe customer IDs and subscription status
-- `Donations` - All payments (one-time and subscription) with Stripe IDs
-
-**New Tables:**
-- `subscription_plans` - Subscription tier definitions
-- `donor_subscriptions` - Active subscription tracking
-- `donor_badges` - Badge rewards (optional)
-
-### Automatic Updates
-
-The system automatically:
-- ✅ Updates campaign progress when donations are made
-- ✅ Updates donor subscription status when subscriptions change
-- ✅ Creates donation records for subscription payments
-- ✅ Links all payments to Stripe for reconciliation
-
----
-
-## 🧪 Testing
-
-Run the test script to verify all endpoints:
-```bash
-python payment/test_payment_api.py
+Expected Response (200):
+{
+  "status": "success",
+  "message": "Payment pi_xxxxxxxxxxxxx marked as completed",
+  "donation_id": 1,
+  "amount": 50.00
+}
 ```
 
-The test script will:
-1. Test health check and plans
-2. Test database-integrated payment creation
-3. Test data retrieval endpoints
-4. Verify database saves are working
+### 13. Stripe Webhook Handler
+```
+Method: POST
+URL: {{base_url}}/webhook
+Headers:
+  Content-Type: application/json
+  Stripe-Signature: whsec_xxxxxxxxxxxxx
+
+Request Body (raw):
+[Stripe webhook payload - handled automatically by Stripe]
+
+Expected Response (200):
+{
+  "status": "success"
+}
+
+Note: This endpoint is for Stripe webhooks only. 
+      Do not test manually unless you have valid Stripe signatures.
+```
 
 ---
 
-## 🔗 Integration Notes
+## 🧪 Testing Sequence
 
-**Frontend Integration:**
-- Use `/create-payment-intent` for one-time donations
-- Use `/create-subscription` for monthly subscriptions
-- Use data endpoints to display campaign progress and user dashboards
+**Recommended testing order:**
 
-**Database Requirements:**
-- Run `subscription_tables.sql` to create required tables
-- Ensure Supabase connection is configured in `.env`
+1. **Health Check** → Verify service is running
+2. **Get Plans** → Check available subscription tiers
+3. **Create Payment Intent** → Test donation creation
+4. **Test Complete Payment** → Simulate successful payment (dev only)
+5. **Get Campaign Donations** → Verify donation was recorded
+6. **Create Subscription** → Test subscription creation
+7. **Get Subscription Status** → Check subscription details
+8. **Get Active Subscriptions** → List all active subscriptions
+9. **Get Payment Stats** → View aggregated data
+10. **Cancel Subscription** → Test subscription cancellation
 
-**Stripe Configuration:**
-- Set up webhook endpoint pointing to `/webhook`
-- Configure webhook to send payment events
+---
+
+## 📝 Notes for Testing
+
+- **Replace placeholder values** like `sub_xxxxxxxxxxxxx` with actual IDs from responses
+- **Use consistent email** across tests to see related data
+- **Check database** after each operation to verify data persistence
+- **Test error cases** by using invalid IDs or malformed requests
+- **Monitor logs** in the Flask console for debugging
+
+---
+
+## 🔧 Environment Variables Required
+
+Ensure your `.env` file contains:
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+SUPABASE_URL=https://...
+SUPABASE_KEY=eyJ...
+```
+
+---
+
+## 🚨 Important
+
+- **Amounts** are in cents (5000 = $50.00)
+- **Timestamps** are Unix timestamps  
+- **Test cards** use Stripe test card numbers (4242424242424242)
+- **Webhooks** require ngrok or similar for local testing

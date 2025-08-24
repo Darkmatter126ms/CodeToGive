@@ -55,9 +55,9 @@ def update_donor_subscription_status(donor_id):
         dict: Updated donor data or None if error
     """
     # Check for active subscriptions
-    active_subs = supabase.table("donor_subscriptions").select("status").eq("donor_id", donor_id).eq("status", "active").execute()
+    active_subs = supabase.table("DonorSubscriptions").select("status").eq("donor_id", donor_id).eq("status", "active").execute()
     
-    past_due_subs = supabase.table("donor_subscriptions").select("status").eq("donor_id", donor_id).in_("status", ["past_due", "trialing"]).execute()
+    past_due_subs = supabase.table("DonorSubscriptions").select("status").eq("donor_id", donor_id).in_("status", ["past_due", "trialing"]).execute()
     
     # Determine status
     if active_subs.data:
@@ -113,7 +113,7 @@ def create_subscription_with_updates(subscription_data):
         dict: Created subscription data
     """
     # Insert subscription
-    subscription_response = supabase.table("donor_subscriptions").insert(subscription_data).execute()
+    subscription_response = supabase.table("DonorSubscriptions").insert(subscription_data).execute()
     
     if subscription_response.data:
         subscription = subscription_response.data[0]
@@ -139,7 +139,7 @@ def update_subscription_status(subscription_id, new_status):
         dict: Updated subscription data
     """
     # Update subscription status
-    subscription_response = supabase.table("donor_subscriptions").update({
+    subscription_response = supabase.table("DonorSubscriptions").update({
         "status": new_status
     }).eq("subscription_id", subscription_id).execute()
     
@@ -208,7 +208,7 @@ def get_donor_summary(donor_id):
     total_donated = sum(donation['amount'] for donation in donations_response.data) if donations_response.data else 0
     
     # Get active subscription
-    subscription_response = supabase.table("donor_subscriptions").select("*").eq("donor_id", donor_id).eq("status", "active").execute()
+    subscription_response = supabase.table("DonorSubscriptions").select("*").eq("donor_id", donor_id).eq("status", "active").execute()
     active_subscription = subscription_response.data[0] if subscription_response.data else None
     
     return {
