@@ -469,7 +469,7 @@ function isDatePassed(dateString) {
                 </div>
 
                 <div v-else class="generated-badge" :style="{ background: `linear-gradient(135deg, ${generatedBadge.colors[0]}, ${generatedBadge.colors[1]})`, width: '200px', height: '200px', borderRadius: '20px', padding: '1.5rem', color: 'white', boxShadow: '0 12px 36px rgba(0, 0, 0, 0.15)', border: '3px solid rgba(255, 255, 255, 0.3)', position: 'relative', overflow: 'hidden' }">
-                  <div class="badge-content" style="position: relative; z-index: 2; display: flex; flexDirection: 'column'; alignItems: 'center'; justifyContent: 'center'; height: '100%'; textAlign: 'center';">
+                  <div class="badge-content" style="position: relative; z-index: 2; display: flex; flex-direction: 'column'; align-items: 'center'; justify-content: 'center'; height: '100%'; text-align: 'center';">
                     <img :src="generatedBadge.schoolLogo" alt="School logo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);" />
                     <div class="badge-text">
                       <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">{{ formData.name }}</h4>
