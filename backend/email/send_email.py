@@ -1,7 +1,3 @@
-# TODO: Implement email sending functionality with endpoints for
-# - Badge + Social Media Sharing
-# - Post Event Email
-
 import os
 import smtplib
 from email.message import EmailMessage

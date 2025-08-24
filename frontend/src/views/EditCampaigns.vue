@@ -100,6 +100,8 @@ async function fetchCampaigns() {
   try {
     const response = await fetch(`${API_BASE_URL}/`)
     const result = await response.json()
+
+    console.log(result)
     
     if (result.status === 'success') {
       // Transform backend data to frontend format
@@ -166,39 +168,6 @@ async function createCampaign() {
     console.error('Error creating campaign:', err)
   } finally {
     loading.value = false
-  }
-}
-
-async function generateBadgeForCampaign(campaignId) {
-  isGeneratingBadge.value = true
-  error.value = null
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/generate-badge/${campaignId}`, {
-      method: 'PUT'
-    })
-    
-    const result = await response.json()
-    
-    if (result.status === 'success') {
-      generatedBadge.value = {
-        theme: selectedTheme.value,
-        schoolLogo: formData.value.schoolLogoPreview,
-        colors: badgeThemes.find(t => t.id === selectedTheme.value).colors,
-        timestamp: Date.now(),
-        url: result.badge
-      }
-      
-      // Refresh campaigns to show updated badge
-      await fetchCampaigns()
-    } else {
-      error.value = result.message || 'Failed to generate badge'
-    }
-  } catch (err) {
-    error.value = 'Network error: ' + err.message
-    console.error('Error generating badge:', err)
-  } finally {
-    isGeneratingBadge.value = false
   }
 }
 
@@ -373,31 +342,75 @@ function selectTheme(themeId) {
   generatedBadge.value = null
 }
 
-function generateBadge() {
+async function generateBadge() {
   if (!formData.value.schoolLogoPreview) return
   
   isGeneratingBadge.value = true
+  error.value = null
   
-  // Simulate badge generation with a delay (will be replaced with actual API call after campaign creation)
-  setTimeout(() => {
-    const theme = badgeThemes.find(t => t.id === selectedTheme.value)
+  try {
+    // First create the campaign to get an ID for badge generation
+    const formDataToSend = new FormData()
+    formDataToSend.append('name', formData.value.name)
+    formDataToSend.append('description', formData.value.description)
+    formDataToSend.append('status', 'open')
+    formDataToSend.append('goal_amount', formData.value.goal_amount)
+    formDataToSend.append('end_date', formData.value.end_date)
     
-    generatedBadge.value = {
-      theme: selectedTheme.value,
-      schoolLogo: formData.value.schoolLogoPreview,
-      colors: theme.colors,
-      timestamp: Date.now()
+    if (formData.value.schoolLogo) {
+      formDataToSend.append('file', formData.value.schoolLogo)
     }
     
+    const campaignResponse = await fetch(`${API_BASE_URL}/`, {
+      method: 'POST',
+      body: formDataToSend
+    })
+    
+    const campaignResult = await campaignResponse.json()
+    
+    if (campaignResult.status === 'success') {
+      const campaignId = campaignResult.data[0].campaign_id
+      
+      // Now generate badge for the created campaign
+      const badgeResponse = await fetch(`${API_BASE_URL}/generate-badge/${campaignId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          theme: selectedTheme.value,
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const badgeResult = await badgeResponse.json()
+
+      console.log(badgeResult)
+      
+      if (badgeResult.status === 'success') {
+        // Set the generated badge URL from the API response
+        generatedBadge.value = badgeResult.badge
+        
+        // Refresh campaigns to show the new campaign with badge
+        await fetchCampaigns()
+      } else {
+        error.value = badgeResult.message || 'Failed to generate badge'
+      }
+    } else {
+      error.value = campaignResult.message || 'Failed to create campaign'
+    }
+  } catch (err) {
+    error.value = 'Network error: ' + err.message
+    console.error('Error generating badge:', err)
+  } finally {
     isGeneratingBadge.value = false
-  }, 2000)
+  }
 }
 
 async function saveBadgeAndCreateCampaign() {
-  if (!generatedBadge.value && !isFormValid.value) return
+  if (!generatedBadge.value) return
   
-  // First create the campaign
-  await createCampaign()
+  // Campaign and badge are already created, just close the forms
+  cancelEdit()
 }
 
 function deleteCampaign(campaignId) {
@@ -779,14 +792,13 @@ onMounted(() => {
                   <p>Generating your badge...</p>
                 </div>
 
-                <div v-else class="generated-badge" :style="{ background: `linear-gradient(135deg, ${generatedBadge.colors[0]}, ${generatedBadge.colors[1]})`, width: '200px', height: '200px', borderRadius: '20px', padding: '1.5rem', color: 'white', boxShadow: '0 12px 36px rgba(0, 0, 0, 0.15)', border: '3px solid rgba(255, 255, 255, 0.3)', position: 'relative', overflow: 'hidden' }">
-                  <div class="badge-content" style="position: relative; z-index: 2; display: flex; flexDirection: 'column'; alignItems: 'center'; justifyContent: 'center'; height: '100%'; textAlign: 'center';">
-                    <img :src="generatedBadge.schoolLogo" alt="School logo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);" />
-                    <div class="badge-text">
-                      <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">{{ formData.name }}</h4>
-                      <p style="font-size: 0.75rem; font-weight: 500; opacity: 0.9; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">{{ selectedTheme }} Theme</p>
-                    </div>
-                  </div>
+                <div v-else class="generated-badge-image" style="text-align: center;">
+                  <img 
+                    :src="generatedBadge" 
+                    alt="Generated campaign badge" 
+                    style="width: 200px; height: 200px; object-fit: cover; border-radius: 20px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15); border: 3px solid #22c55e;" 
+                  />
+                  <p style="margin-top: 1rem; color: #22c55e; font-weight: 600; font-size: 0.9rem;">Badge Generated ✓</p>
                 </div>
               </div>
             </div>
@@ -888,8 +900,8 @@ onMounted(() => {
               <span class="trust-badge" :class="getStatusBadgeClass(campaign.status)">
                 {{ campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1) }}
               </span>
-              <div class="school-logo-badge" v-if="campaign.schoolLogo">
-                <img :src="campaign.schoolLogo" alt="School logo" class="badge-preview-image" />
+              <div class="school-logo-badge" v-if="campaign.badgeImage">
+                <img :src="campaign.badgeImage" alt="School logo" class="badge-preview-image" />
               </div>
             </div>
           </div>
@@ -1099,32 +1111,19 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-.generated-badge {
-  width: 200px;
-  height: 200px;
-  border-radius: 20px;
-  padding: 1.5rem;
-  color: white;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  position: relative;
-  overflow: hidden;
+.generated-badge-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.generated-badge::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-  animation: shimmer 3s infinite;
+.generated-badge-image img {
+  transition: transform 0.3s ease;
 }
 
-@keyframes shimmer {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(180deg); }
+.generated-badge-image img:hover {
+  transform: scale(1.05);
 }
 
 .badge-content {
@@ -1539,10 +1538,9 @@ onMounted(() => {
     font-size: 0.85rem;
   }
   
-  .generated-badge {
+  .generated-badge-image img {
     width: 160px;
     height: 160px;
-    padding: 1rem;
   }
   
   .campaign-action-btn {
@@ -1589,10 +1587,6 @@ onMounted(() => {
 
 /* Enhanced loading states */
 @media (prefers-reduced-motion: reduce) {
-  .generated-badge::before {
-    animation: none;
-  }
-  
   .story-card.campaign-card {
     animation: none;
   }
