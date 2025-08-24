@@ -111,7 +111,33 @@ def view_campaign(campaign_id):
     else:
         return jsonify({"status": "error", "message": "Campaign not found"}), 404
 
-# Update Campaign
+# Update Campaign (PATCH - for partial JSON updates)
+@campaign_blueprint.route("/<int:campaign_id>", methods=["PATCH"])
+def patch_campaign(campaign_id):
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+        
+        # Update the campaign with provided fields
+        response = (
+            supabase.table("Campaigns")
+            .update(data)
+            .eq("campaign_id", campaign_id)
+            .execute()
+        )
+        
+        if response.data:
+            return jsonify({"status": "success", "data": response.data}), 200
+        else:
+            return jsonify({"status": "error", "message": "Failed to update campaign"}), 400
+            
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Error updating campaign: {str(e)}"}), 500
+
+# Update Campaign (PUT - for full form updates with files)
 @campaign_blueprint.route("/<int:campaign_id>", methods=["PUT"])
 def update_campaign(campaign_id):
     # Accept form data and file

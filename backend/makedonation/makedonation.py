@@ -76,6 +76,10 @@ def donate():
             }), 500
         
         if payment_data.get("success"):
+            current_amount = requests.get(f"{campaign_URL}/{campaign_id}").json().get("data", [{}])[0].get("current_amount")
+            current_amount += amount
+            requests.patch(f"{campaign_URL}/{campaign_id}", json={"current_amount": current_amount})
+
             # Payment succeeded, proceed to create or get donor
             donor_id = None  # Initialize donor_id
             
