@@ -4,3 +4,5 @@ python-dotenv
 pytz
 supabase
 Jinja2
+stripe
+requests
