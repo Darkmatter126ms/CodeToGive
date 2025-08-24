@@ -130,6 +130,7 @@ async function fetchCampaigns() {
         .map((campaign) => {
           const schoolName = extractSchoolName(campaign.name)
           const region = extractRegion(schoolName, campaign.description)
+          console.log(campaign)
           return {
             id: campaign.campaign_id,
             title: campaign.name,
@@ -141,7 +142,7 @@ async function fetchCampaigns() {
             startDate: campaign.created_at ? campaign.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
             endDate: campaign.end_date,
             goal: campaign.goal_amount || 0,
-            raised: campaign.raised_amount || 0,
+            raised: campaign.current_amount || 0,
             supporters: Math.floor(Math.random() * 300) + 50,
             status: mapStatus(campaign.status)
           }

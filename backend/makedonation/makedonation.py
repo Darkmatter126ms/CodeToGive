@@ -114,14 +114,14 @@ def donate():
                         
                         # Try different ways to extract donor_id
                         if isinstance(donor_json, dict):
-                            if "data" in donor_json:
-                                if isinstance(donor_json["data"], list) and len(donor_json["data"]) > 0:
-                                    donor_id = donor_json["data"][0].get("id")
-                                else:
-                                    donor_id = donor_json["data"].get("id")
-                            elif "id" in donor_json:
-                                donor_id = donor_json.get("id")
-                        
+                            data = donor_json.get("data")
+                            if isinstance(data, list) and len(data) > 0:
+                                donor_id = data[0].get("donor_id")
+                            elif isinstance(data, dict):  # in case API returns a single dict in future
+                                donor_id = data.get("donor_id")
+                            elif "donor_id" in donor_json:
+                                donor_id = donor_json.get("donor_id")
+
                         print(f"Extracted donor ID: {donor_id}")
                         
                         if not donor_id:

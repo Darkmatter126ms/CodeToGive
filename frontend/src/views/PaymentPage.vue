@@ -226,6 +226,7 @@ export default {
         // Prepare payment data for backend
         const paymentData = {
           campaign_id: this.selectedCampaign,
+          name:this.donorInfo.name,
           email: this.donorInfo.email,
           amount: this.finalAmount,
           charge: {
