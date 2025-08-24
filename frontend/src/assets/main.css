@@ -1026,3 +1026,40 @@ html{
 ::-webkit-scrollbar-thumb:hover{ 
   background:#94a3b8; 
 }
+
+/* Photo hero: background image + tint overlay driven by CSS vars */
+.hero-photo{
+  position: relative;
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.hero-photo::before{ /* the photo */
+  content:"";
+  position:absolute; inset:0;
+  background-image: var(--hero-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: scale(1.02);
+  filter: saturate(1.05) contrast(1.05);
+}
+.hero-photo::after{  /* the tint */
+  content:"";
+  position:absolute; inset:0;
+  background: var(--hero-tint, rgba(15,23,42,.35)); /* default soft dark */
+}
+
+/* keep content above overlays */
+.hero-photo > .container{ position: relative; z-index: 1; }
+
+/* legible text on photos */
+.hero-photo h1,
+.hero-photo h2,
+.hero-photo p { color: rgba(255,255,255,.98) !important; }
+
+/* optional tint presets */
+.tint-dark { --hero-tint: rgba(15,23,42,.42); }
+.tint-soft { --hero-tint: rgba(15,23,42,.26); }
+.tint-brand{ --hero-tint: linear-gradient(180deg, rgba(76,29,149,.38), rgba(2,6,23,.28)); }
