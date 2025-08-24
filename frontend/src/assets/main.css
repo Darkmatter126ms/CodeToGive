@@ -1063,3 +1063,37 @@ html{
 .tint-dark { --hero-tint: rgba(15,23,42,.42); }
 .tint-soft { --hero-tint: rgba(15,23,42,.26); }
 .tint-brand{ --hero-tint: linear-gradient(180deg, rgba(76,29,149,.38), rgba(2,6,23,.28)); }
+
+Center content inside stat cards
+.stat-card{
+  display: flex;
+  flex-direction: column;
+  align-items: center;       /* horizontal centering */
+  justify-content: center;   /* vertical centering */
+  text-align: center;
+  gap: .25rem;               /* space between number and label */
+}
+
+/* Make the dollar amount render perfectly centered */
+.stat-card .stat-number{
+  width: 100%;
+  text-align: center;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;           /* avoids optical shift */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Optional: only for the money tile */
+.stat-card.stat-money .stat-number{
+  font-size: clamp(2rem, 4.6vw, 3rem);          /* prevents overflow */
+  letter-spacing: -0.02em;
+}
+
+
+/* --- Fix: podium card no longer overlaps heading --- */
+.podium-title{ margin-bottom: 2.5rem; }         /* optional: more breathing room */
+
+.story-card.campaign-card.featured{             /* emphasize without scaling */
+  border: 2px solid #f59e0b;
+  box-shadow: 0 20px 60px rgba(0,0,0,.12), 0 10px 30px rgba(0,0,0,.08);
+}
