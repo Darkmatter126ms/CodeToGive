@@ -55,7 +55,7 @@ def view_donations():
         return jsonify({"status": "error", "message": "Failed to retrieve donations"}), 400
     
 # View Donations
-@donation_blueprint.route('/<int: donation_id>', methods=['GET'])
+@donation_blueprint.route('/<int:donation_id>', methods=['GET'])
 def view_donor_donations(donation_id):
     response = supabase.table("Donations").select("*").eq("donation_id", donation_id).execute()
     if response.data:
