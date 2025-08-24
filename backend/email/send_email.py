@@ -29,7 +29,6 @@ SMTP_PASS = os.getenv("SMTP_PASS")
 FROM_NAME = "Project Reach Team"
 FROM_EMAIL = SMTP_USER
 TEMPLATE_DIR = "templates"
-SUBJECT = "Welcome to Project Reach 👋"
 
 def send_email(message: EmailMessage):
     use_ssl = (SMTP_PORT == 465)
@@ -41,6 +40,7 @@ def send_email(message: EmailMessage):
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
             smtp.ehlo()
             smtp.starttls()
+            smtp.ehlo()  # Call ehlo() again after starttls()
             smtp.login(SMTP_USER, SMTP_PASS)
             smtp.send_message(message)
 
@@ -53,17 +53,20 @@ def health_check():
 @email_blueprint.route('/send-email', methods=['POST'])
 def send_email_template_endpoint():
     data = request.json
-    email_type = data.get('email_type', 'default')
-    to_emails = data.get('to_emails', [])
+    email_type = data.get('email_type')
+    to_email = data.get('to_email')
     context = data.get('context', {})
 
     # Select template based on email_type
-    if email_type == "badge":
-        template_file = "badge_social.html"
+    if email_type == "thanks":
+        subject = "Thank You for Your Donation!"
+        template_file = "thanks.html"
     elif email_type == "post_event":
+        subject = "Campaign Update - PROJECT REACH"
         template_file = "post_event.html"
-    else:
-        template_file = "welcome.html"
+    elif email_type == "badge":
+        subject = "Congratulations - You've Earned a Badge!"
+        template_file = "badge.html"
 
     env = Environment(
         loader=FileSystemLoader(TEMPLATE_DIR),
@@ -73,9 +76,9 @@ def send_email_template_endpoint():
     html_body = template.render(**context)
 
     msg = EmailMessage()
-    msg["Subject"] = SUBJECT
+    msg["Subject"] = subject
     msg["From"] = formataddr((FROM_NAME, FROM_EMAIL))
-    msg["To"] = ", ".join(to_emails)
+    msg["To"] = to_email
     msg.set_content("This is a fallback plain text message.")
     msg.add_alternative(html_body, subtype="html")
 
@@ -83,9 +86,10 @@ def send_email_template_endpoint():
         send_email(msg)
         return jsonify({"status": "success"}), 200
     except Exception as e:
+        print(f"Error sending email: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 app.register_blueprint(email_blueprint, url_prefix="/email")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8082)
+    app.run(host='0.0.0.0', port=8087)

@@ -1,6 +1,9 @@
 import os
-
+from dotenv import load_dotenv
 import requests
+
+
+load_dotenv()
 
 # === CONFIG ===
 API_KEY = os.getenv("API_KEY")
@@ -9,10 +12,8 @@ OUTPUT_DIR = "generated_images"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-
 def generate_badge(
-    prompt: str, output_filename: str = "output.png", base_image_url: str = None
-):
+    prompt: str, base_image_url: str = None, output_filename: str = "output.png"):
     """
     Generates an image using the SiliconFlow AI API based on the given prompt.
 
@@ -25,13 +26,12 @@ def generate_badge(
         "model": "stabilityai/stable-diffusion-3-5-large",
         "prompt": prompt,
         "size": "1024x1024",
-        "image_url": base_image_url,
         "n": 1,
         "response_format": "url",
     }
 
-    if base_image_url:
-        payload["init_image"] = base_image_url
+    if base_image_url and base_image_url.strip() and base_image_url != "None":
+        payload["image_url"] = base_image_url
         payload["strength"] = 0.7  # optional: adjust influence of base image
 
     headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}

@@ -35,7 +35,7 @@ const router = createRouter({
       component: Leaderboard
     },
     {
-      path: '/payment',
+      path: '/payment/:campaignId?',
       name: 'payment',
       component: PaymentPage
     },

@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Thank you for your donation!</title>
+  <style>
+    /* Email-safe styles */
+    .btn { 
+      display: inline-block;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: bold;
+      margin: 8px 4px;
+    }
+    .btn-whatsapp {
+      background: #25d366;
+    }
+    .card { 
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #111827;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .impact-stat {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Logo Placeholder -->
+    <h1 style="color: #2563eb; font-size: 28px; margin-bottom: 20px; text-align: left;">PROJECT REACH</h1>
+    
+    <!-- Main Thank You Message -->
+    <h2>🎉 Thank you, {{ donor_name }}!</h2>
+    <p>Your generous <strong>${{ donation_amount }}</strong> donation to <em>{{ campaign_name }}</em> is making a real difference!</p>
+    
+    <!-- Simple Impact Message -->
+    <div class="impact-stat">
+      <h3>Your Impact Matters</h3>
+      <p>Your <strong>${{ donation_amount }}</strong> contribution to <strong>{{ campaign_name }}</strong> will help support students in need.</p>
+      <p style="font-size: 14px; color: #6b7280;">Every donation brings us closer to making education accessible for all.</p>
+    </div>
+    
+    <!-- WhatsApp Share Button -->
+    <div style="text-align: center; margin: 24px 0;">
+      <h3>📢 Share Your Impact!</h3>
+      <p>Help us reach more people who care about education:</p>
+      <a class="btn btn-whatsapp" href="https://wa.me/?text=I%27m%20making%20a%20real%20difference%20through%20REACH%20Impact%20Hub!%20%F0%9F%8E%93%E2%9C%A8%0A%0AThis%20month%20alone%2C%20I%20helped%2025%20students%20in%20Hong%20Kong%20get%20better%20education%20resources.%20It%27s%20amazing%20to%20see%20the%20direct%20impact!%0A%0AWant%20to%20join%20me%3F%20Check%20out:%20https://reach-impact-hub.com%0A%0A%23EducationForAll%20%23MakeADifference" target="_blank">💬 Share on WhatsApp</a>
+    </div>
+    
+    <!-- Footer -->
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
+    <p style="font-size: 14px; color: #6b7280; text-align: center;">
+      <strong>REACH Impact Hub</strong><br>
+      Connecting generous people with students who need champions.
+    </p>
+  </div>
+</body>
+</html>

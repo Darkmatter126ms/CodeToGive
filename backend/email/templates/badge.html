@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Congratulations - You've Earned a Badge!</title>
+  <style>
+    /* Email-safe styles */
+    .btn { 
+      display: inline-block;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: bold;
+      margin: 8px 4px;
+    }
+    .btn-whatsapp {
+      background: #25d366;
+    }
+    .card { 
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #111827;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .badge-celebration {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: #92400e;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-size: 18px;
+      font-weight: bold;
+      margin: 16px 0;
+      border: 3px solid white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .achievement-details {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Logo -->
+    <h1 style="color: #2563eb; font-size: 28px; margin-bottom: 20px; text-align: left;">PROJECT REACH</h1>
+    
+    <!-- Main Celebration Section -->
+    <div class="badge-celebration">
+      <h1 style="margin: 0 0 16px 0; font-size: 32px;">🏆 CONGRATULATIONS!</h1>
+      <h2 style="margin: 0 0 20px 0;">{{ donor_name }}, You've Earned a New Badge!</h2>
+      <div style="text-align: center; margin: 20px 0;">
+        <img src="{{ badge_earned }}" alt="Achievement Badge" style="max-width: 200px; height: auto; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 3px solid white;">
+      </div>
+      <p style="margin: 16px 0 0 0; opacity: 0.9; font-size: 18px;">You're now part of an exclusive group of champions!</p>
+    </div>
+    
+    <!-- Achievement Details -->
+    <div class="achievement-details">
+      <h3>🌟 What This Badge Represents</h3>
+      <p>Your incredible support of <strong>{{ campaign_name }}</strong> has earned you this exclusive achievement badge!</p>
+      <p style="font-size: 16px; margin: 16px 0;">
+        This achievement recognizes your exceptional commitment to making a difference in students' lives.
+      </p>
+      <p style="font-style: italic; color: #92400e;">
+        Thank you for being a true champion of education! 🎓
+      </p>
+    </div>
+    
+    <!-- Impact Message -->
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
+      <h3>Your Impact Continues</h3>
+      <p>Your support of <strong>{{ campaign_name }}</strong> is creating lasting change and inspiring others to join our mission.</p>
+    </div>
+    
+    <!-- Share Achievement -->
+    <div style="text-align: center; margin: 24px 0;">
+      <h3>📢 Celebrate Your Achievement!</h3>
+      <p>Share your achievement badge and inspire others to support <strong>{{ campaign_name }}</strong>:</p>
+      <a class="btn btn-whatsapp" href="https://wa.me/?text=I%27m%20making%20a%20real%20difference%20through%20REACH%20Impact%20Hub!%20%F0%9F%8E%93%E2%9C%A8%0A%0AThis%20month%20alone%2C%20I%20helped%2025%20students%20in%20Hong%20Kong%20get%20better%20education%20resources.%20It%27s%20amazing%20to%20see%20the%20direct%20impact!%0A%0AWant%20to%20join%20me%3F%20Check%20out:%20https://reach-impact-hub.com%0A%0A%23EducationForAll%20%23MakeADifference" target="_blank">💬 Share on WhatsApp</a>
+    </div>
+    
+    <!-- Footer -->
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
+    <p style="font-size: 14px; color: #6b7280; text-align: center;">
+      <strong>PROJECT REACH</strong><br>
+      Connecting generous people with students who need champions.
+    </p>
+    
+    <!-- Congratulatory Note -->
+    <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 16px;">
+      🏆 You are making education accessible for all - keep up the amazing work!
+    </p>
+  </div>
+</body>
+</html>

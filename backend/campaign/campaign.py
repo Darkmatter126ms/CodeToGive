@@ -23,16 +23,13 @@ CORS(app)
 # Create Blueprint for campaign routes
 campaign_blueprint = Blueprint("campaign", __name__)
 
-
 def sanitize_filename(name):
     return re.sub(r"\s+", "_", name)
-
 
 # Health Check
 @campaign_blueprint.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "alive"}), 200
-
 
 # Create Campaign
 @campaign_blueprint.route("/", methods=["POST"])
@@ -82,7 +79,6 @@ def create_campaign():
     else:
         return jsonify({"status": "error", "message": "Failed to create campaign"}), 400
 
-
 # View All Campaigns
 @campaign_blueprint.route("/", methods=["GET"])
 def view_all_campaigns():
@@ -91,7 +87,6 @@ def view_all_campaigns():
         return jsonify({"status": "success", "data": response.data}), 200
     else:
         return jsonify({"status": "error", "message": "No campaigns found"}), 404
-
 
 # View Campaign
 @campaign_blueprint.route("/<int:campaign_id>", methods=["GET"])
@@ -103,7 +98,6 @@ def view_campaign(campaign_id):
         return jsonify({"status": "success", "data": response.data}), 200
     else:
         return jsonify({"status": "error", "message": "Campaign not found"}), 404
-
 
 # Update Campaign
 @campaign_blueprint.route("/<int:campaign_id>", methods=["PUT"])
@@ -156,7 +150,6 @@ def update_campaign(campaign_id):
     else:
         return jsonify({"status": "error", "message": "Failed to update campaign"}), 400
 
-
 # Delete Campaign
 @campaign_blueprint.route("/<int:campaign_id>", methods=["DELETE"])
 def delete_campaign(campaign_id):
@@ -171,17 +164,15 @@ def delete_campaign(campaign_id):
     else:
         return jsonify({"status": "error", "message": "Failed to delete campaign"}), 400
 
-
 import mimetypes
 import os
-
 
 @campaign_blueprint.route("/generate-badge/<int:campaign_id>", methods=["PUT"])
 def create_badge(campaign_id):
     # Step 1: Fetch campaign from Supabase to get description
     campaign = (
         supabase.table("Campaigns")
-        .select("description, name")
+        .select("description, name, school_logo")
         .eq("campaign_id", campaign_id)
         .single()
         .execute()
@@ -192,21 +183,35 @@ def create_badge(campaign_id):
 
     description = campaign.data.get("description")
     name = campaign.data.get("name")
-    base_image = campaign.get("school_logo")
+    base_image = campaign.data.get("school_logo") 
 
     # Step 2: Construct the AI prompt
     prompt = (
-        f"Context: This badge is being created to appreciate and recognize sponsors of the '{name}' campaign. "
-        f"Style: Based on previous image uploaded.  "
-        f"Theme: Celebratory, prestigious, and honorable. "
-        f"Audience: Sponsors and supporters of the '{name}' campaign. "
-        f"Response: A clean image of a badge on a white background, with '{name}' prominently displayed in an elegant font. "
-        f"Description: {description}."
+        f"Create a professional sponsor appreciation badge for '{name}' campaign. "
+        f"Design requirements: "
+        f"- Clean, elegant circular or shield-shaped badge on pure white background "
+        f"- Bold, readable text '{name}' as the main title in premium serif or sans-serif font "
+        f"- Subtitle text 'Sponsor Appreciation' or 'Thank You Sponsor' below the main title "
+        f"- Rich color scheme with gold, blue, or deep green accents "
+        f"- Subtle gradient or metallic finish effect "
+        f"- Professional border with decorative elements like laurel leaves, stars, or geometric patterns "
+        f"- High contrast for text readability "
+        f"- Corporate/institutional aesthetic suitable for formal recognition "
+        f"- Campaign focus: {description} "
+        f"- Style: Premium certificate design, award-quality appearance, modern typography "
+        f"- No complex backgrounds, maintain focus on text and elegant design elements"
     )
+
+    # Debug: Print the values we're about to use
+    print(f"DEBUG - Campaign: {name}")
+    print(f"DEBUG - Description: {description}")
+    print(f"DEBUG - Base image URL: {base_image}")
+    print(f"DEBUG - Base image type: {type(base_image)}")
+    formatted_name = sanitize_filename(name)
 
     try:
         image_path = generate_badge(
-            prompt, output_filename=f"{name}_badge.png", base_image_url=base_image
+            prompt, base_image_url=base_image, output_filename=f"{formatted_name}_badge.png"
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -240,7 +245,6 @@ def create_badge(campaign_id):
         )
     else:
         return jsonify({"status": "error", "message": "Failed to create badge"}), 400
-
 
 # Register the campaign Blueprint with the app
 app.register_blueprint(campaign_blueprint, url_prefix="/campaign")

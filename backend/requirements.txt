@@ -6,3 +6,4 @@ supabase
 Jinja2
 stripe
 requests
+schedule

@@ -17,10 +17,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = Flask(__name__)
 CORS(app)
 
-campaign_URL = "http://127.0.0.1:8082/campaign"
-donor_URL = "http://127.0.0.1:8083/donor"
+donor_URL = "http://127.0.0.1:8081/donor"
+campaign_URL = "http://127.0.0.1:8080/campaign"
 donation_URL = "http://127.0.0.1:8084/donation"
 stripe_URL = "http://127.0.0.1:8085/stripeservice"
+email_URL = "http://127.0.0.1:8087/email"
 
 # Create Blueprint for donation routes
 makedonation_blueprint = Blueprint("makedonation", __name__)
@@ -29,7 +30,6 @@ makedonation_blueprint = Blueprint("makedonation", __name__)
 @makedonation_blueprint.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy"})
-
 
 @makedonation_blueprint.route("/donate", methods=["POST"])
 def donate():
@@ -49,35 +49,106 @@ def donate():
     print("Forwarding to Stripe service:", charge)
     
     # Forward the charge data to stripe service
-    payment = requests.post(
-        f"{stripe_URL}/charges",
-        json=charge,  # Send the charge object directly (contains amount, currency, description, source)
-        headers={'Content-Type': 'application/json'}
-    )
-
     try:
-        payment_data = payment.json()
-        print("Stripe response:", payment_data)
+        payment = requests.post(
+            f"{stripe_URL}/charges",
+            json=charge,
+            headers={'Content-Type': 'application/json'}
+        )
         
-        if payment.status_code == 200 and payment_data.get("success"):
+        print(f"Stripe service status code: {payment.status_code}")
+        print(f"Stripe service raw response: {payment.text}")
+        
+        if payment.status_code != 200:
+            return jsonify({
+                "success": False,
+                "error": f"Stripe service returned status {payment.status_code}: {payment.text}"
+            }), payment.status_code
+
+        try:
+            payment_data = payment.json()
+            print("Stripe response:", payment_data)
+        except ValueError as e:
+            print(f"Failed to parse Stripe response as JSON: {e}")
+            return jsonify({
+                "success": False,
+                "error": f"Invalid JSON response from Stripe service: {payment.text}"
+            }), 500
+        
+        if payment_data.get("success"):
             # Payment succeeded, proceed to create or get donor
-            donor_response = requests.get(f"{donor_URL}/{email}")   
-            if donor_response.status_code == 200 and donor_response.json().get("data"):
-                donor_id = donor_response.json()["data"][0].get("id")
-            else:
-                # Create new donor if not found
-                donor = {
-                    "email": email,
-                    "name": name,
-                }
-                donor_response = requests.post(donor_URL, json=donor)
-                if donor_response.status_code == 201:
-                    donor_id = donor_response.json().get("id")
-                else:
-                    return jsonify({
-                        "success": False,
-                        "error": donor_response.json().get("error", "Failed to create donor")
-                    }), donor_response.status_code
+            donor_id = None  # Initialize donor_id
+            
+            try:
+                print(f"Looking up donor with email: {email}")
+                donor_response = requests.get(f"{donor_URL}/{email}")
+                print(f"Donor lookup response: {donor_response.status_code}")
+                print(f"Donor lookup response body: {donor_response.text}")
+                
+                if donor_response.status_code == 200:
+                    donor_json = donor_response.json()
+                    print(f"Donor lookup JSON: {donor_json}")
+                    
+                    if donor_json.get("data"):
+                        donor_data = donor_json["data"]
+                        if isinstance(donor_data, list) and len(donor_data) > 0:
+                            donor_id = donor_data[0].get("donor_id")
+                        else:
+                            donor_id = donor_data.get("donor_id")
+                        print(f"Found existing donor with ID: {donor_id}")
+                        
+                if not donor_id:
+                    # Create new donor if not found
+                    print(f"Creating new donor for email: {email}, name: {name}")
+                    donor = {
+                        "email": email,
+                        "name": name,
+                    }
+                    donor_response = requests.post(donor_URL, json=donor)
+                    print(f"Create donor response: {donor_response.status_code}")
+                    print(f"Create donor response body: {donor_response.text}")
+                    
+                    if donor_response.status_code == 201:
+                        donor_json = donor_response.json()
+                        print(f"Create donor JSON: {donor_json}")
+                        
+                        # Try different ways to extract donor_id
+                        if isinstance(donor_json, dict):
+                            if "data" in donor_json:
+                                if isinstance(donor_json["data"], list) and len(donor_json["data"]) > 0:
+                                    donor_id = donor_json["data"][0].get("id")
+                                else:
+                                    donor_id = donor_json["data"].get("id")
+                            elif "id" in donor_json:
+                                donor_id = donor_json.get("id")
+                        
+                        print(f"Extracted donor ID: {donor_id}")
+                        
+                        if not donor_id:
+                            return jsonify({
+                                "success": False,
+                                "error": f"Failed to extract donor ID from response: {donor_json}"
+                            }), 500
+                    else:
+                        return jsonify({
+                            "success": False,
+                            "error": f"Failed to create donor: {donor_response.text}"
+                        }), donor_response.status_code
+                        
+            except requests.exceptions.ConnectionError:
+                return jsonify({
+                    "success": False,
+                    "error": "Donor service is not available. Please start the donor service."
+                }), 503
+                
+            # Verify we have a donor_id before proceeding
+            if not donor_id:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to obtain donor ID"
+                }), 500
+                
+            print(f"Final donor_id before creating donation: {donor_id}")
                 
             # Create the donation record
             donation = {
@@ -85,27 +156,57 @@ def donate():
                 "donor_id": donor_id,
                 "amount": amount,
             }
+            
+            print(f"Creating donation with data: {donation}")
 
-            donation_response = requests.post(donation_URL, json=donation)
-            if donation_response.status_code == 201:
-                return jsonify({"success": True, "data": donation_response.json()}), 201
-            else:
+            try:
+                donation_response = requests.post(donation_URL, json=donation)
+                print(f"Donation response: {donation_response.status_code}")
+                print(f"Donation response body: {donation_response.text}")
+                
+                if donation_response.status_code == 201:
+
+                    campaign_name = requests.get(f"{campaign_URL}/{campaign_id}").json().get("data", [{}])[0].get("name")
+                    email_context = {
+                        "email_type": "thanks",
+                        "to_email": email,
+                        "context": {
+                            "donor_name": name,
+                            "donation_amount": amount,
+                            "campaign_name": campaign_name
+                        }
+                    }
+                    requests.post(f"{email_URL}/send-email", json=email_context)
+
+                    return jsonify({"success": True, "data": donation_response.json()}), 201
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": f"Failed to create donation: {donation_response.text}"
+                    }), donation_response.status_code
+                
+            except requests.exceptions.ConnectionError:
                 return jsonify({
                     "success": False,
-                    "error": donation_response.json().get("error", "Failed to create donation")
-                }), donation_response.status_code
+                    "error": "Donation service is not available. Please start the donation service."
+                }), 503
+
 
         else:
             return jsonify({
                 "success": False,
                 "error": payment_data.get("error", "Payment failed")
-            }), payment.status_code
+            }), 400
             
-    except ValueError:
-        payment_data = {"error": "Stripe service did not return valid JSON", "raw": payment.text}
+    except requests.exceptions.ConnectionError:
         return jsonify({
             "success": False,
-            "error": "Invalid response from payment service"
+            "error": "Stripe service is not available. Please start the Stripe service on port 8085."
+        }), 503
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
         }), 500
 
 app.register_blueprint(makedonation_blueprint, url_prefix="/makedonation")

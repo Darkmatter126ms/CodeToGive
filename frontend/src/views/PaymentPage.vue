@@ -16,32 +16,7 @@ export default {
       isLoading: false,
       paymentSuccess: false,
       paymentError: "",
-      campaigns: [
-        {
-          id: 1,
-          title: "Emergency School Meals",
-          description:
-            "Provide nutritious meals to children affected by recent floods",
-          image:
-            "https://images.unsplash.com/photo-1498721406610-899c1d4eb77d?q=80&w=400",
-        },
-        {
-          id: 2,
-          title: "Digital Learning Kits",
-          description:
-            "Tablets and educational apps for children in remote areas",
-          image:
-            "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400",
-        },
-        {
-          id: 3,
-          title: "Safe Play Spaces",
-          description:
-            "Building secure playgrounds in underserved neighborhoods",
-          image:
-            "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?q=80&w=400",
-        },
-      ],
+      campaigns: [],
       // Payment type selection
       paymentType: "one-time", // 'one-time' or 'subscription'
 
@@ -65,8 +40,9 @@ export default {
       paymentSuccess: false,
       paymentError: "",
 
-      // Campaign selection (automatically set to first campaign)
-      selectedCampaign: 0, // Always use the first campaign
+      // Campaign selection (get from URL parameters)
+      selectedCampaign: null, // Will be set from route params
+      campaignFromUrl: null, // Store campaign data fetched from API
 
       // Stripe
       stripe: null,
@@ -92,6 +68,18 @@ export default {
   },
   async mounted() {
     console.log("PaymentPage mounted, initializing Stripe...");
+    
+    console.log("Route query:", this.$route.query);
+    
+    // Get campaign ID from route parameters
+    this.selectedCampaign = this.$route.query.campaignid;
+    console.log("Campaign ID from URL:", this.selectedCampaign);
+
+    // Fetch campaign data if ID is provided
+    if (this.selectedCampaign) {
+      await this.fetchCampaignData(this.selectedCampaign);
+    }
+
     console.log("Available campaigns:", this.campaigns);
 
     try {
@@ -110,6 +98,30 @@ export default {
     }
   },
   methods: {
+    async fetchCampaignData(campaignId) {
+      try {
+        console.log("Fetching campaign data for ID:", campaignId);
+        const response = await axios.get(`http://127.0.0.1:8080/campaign/${campaignId}`);
+        
+        if (response.data && response.data.status === 'success') {
+          // Store the campaign data from API
+          this.campaignFromUrl = response.data.data[0];
+          console.log("Campaign data fetched:", this.campaignFromUrl);
+          
+          // Override the default campaigns array with the fetched campaign
+          this.campaigns = [{
+            id: this.campaignFromUrl.campaign_id,
+            title: this.campaignFromUrl.name,
+            description: this.campaignFromUrl.description,
+            image: this.campaignFromUrl.school_logo || "https://images.unsplash.com/photo-1498721406610-899c1d4eb77d?q=80&w=400"
+          }];
+        }
+      } catch (error) {
+        console.error("Error fetching campaign data:", error);
+        // Keep using default campaigns if API fails
+      }
+    },
+
     async setupCardElement() {
       console.log("Setting up card element...");
 
@@ -219,7 +231,7 @@ export default {
           charge: {
             amount: Math.round(this.finalAmount * 100),
             currency: "sgd",
-            description: `Donation for ${this.campaigns[this.selectedCampaign]?.title || 'Campaign'}`,
+            description: `Donation for ${this.campaigns[0]?.title || 'Campaign'}`,
             source: token.id
           }
         };
