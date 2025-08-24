@@ -29,7 +29,7 @@ function donate(){
       </p>
 
       <div class="mt-8 flex flex-wrap justify-center items-center gap-4">
-        <button class="btn-donate" @click="donate">Fund a child's future</button>
+        <a href="/viewcampaigns" class="btn-donate">Fund a child's future</a>
         <a href="#about" class="btn-secondary">Learn about REACH</a>
       </div>
 
@@ -134,7 +134,7 @@ function donate(){
   <!-- PROGRAMS -->
   <section class="section-light">
     <div class="container py-16">
-      <h2 class="text-center mb-10 font-weight-700 text-slate-900" style="font-size: 2.5rem; font-weight: 800; letter-spacing: -0.5px;">Programs needing your support</h2>
+      <h2 class="text-center mb-10 py-8 font-weight-700 text-slate-900" style="font-size: 2.5rem; font-weight: 800; letter-spacing: -0.5px;">Programs needing your support</h2>
       <div class="grid md:grid-cols-3 gap-6">
         <article class="card p-6">
           <h3>English Bridge Program</h3>
