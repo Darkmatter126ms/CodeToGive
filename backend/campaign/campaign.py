@@ -139,6 +139,7 @@ def delete_campaign(campaign_id):
     else:
         return jsonify({"status": "error", "message": "Failed to delete campaign"}), 400
 
+# Add Badge
 @campaign_blueprint.route('generate-badge/<int:campaign_id>', methods=['PUT'])
 def create_badge(campaign_id):
     badge = request.files.get("badge")
