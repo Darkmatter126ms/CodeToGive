@@ -1,3 +1,4 @@
+from multiprocessing import context
 import os
 import schedule
 import time
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import logging
 from zoneinfo import ZoneInfo
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -85,12 +87,8 @@ def process_campaign(campaign):
                 
                 if current_time >= end_date_obj:
                     close_expired_campaign(campaign_id, title)
+                    send_email(campaign)
                     return
-                    
-                # Check for campaigns close to expiring (within 7 days)
-                days_remaining = (end_date_obj - current_time).days
-                if 0 <= days_remaining <= 7:
-                    notify_expiring_campaign(campaign_id, title, days_remaining)
                     
             except (ValueError, TypeError) as date_error:
                 logger.error(f"❌ Error parsing end_date '{end_date}' for campaign {campaign_id}: {date_error}")
@@ -98,6 +96,7 @@ def process_campaign(campaign):
         # Check if campaign has reached its goal
         if goal_amount > 0 and current_amount >= goal_amount:
             close_completed_campaign(campaign_id, title)
+            send_email(campaign)
             return
         
         # Log campaign status
@@ -120,6 +119,9 @@ def close_expired_campaign(campaign_id, title):
         
         if response.data:
             logger.info(f"⏰ Closed expired campaign: {title}")
+            # Send badge emails to all donors
+            campaign_data = response.data[0]  # Get the updated campaign data
+            send_email(campaign_data)
         else:
             logger.error(f"❌ Failed to close expired campaign: {title}")
             
@@ -132,12 +134,15 @@ def close_completed_campaign(campaign_id, title):
     """
     try:
         # Update campaign status to finished
-        response = supabase.table('campaigns').update({
+        response = supabase.table('Campaigns').update({
             'status': 'finished'
         }).eq('campaign_id', campaign_id).execute()
         
         if response.data:
             logger.info(f"🎉 Closed finished campaign: {title}")
+            # Send badge emails to all donors
+            campaign_data = response.data[0]  # Get the updated campaign data
+            send_email(campaign_data)
             # You could trigger celebration notifications here
         else:
             logger.error(f"❌ Failed to close finished campaign: {title}")
@@ -195,6 +200,42 @@ def run_scheduler():
     while True:
         schedule.run_pending()
         time.sleep(60)  # Check every minute
+
+def send_email(campaign):
+
+    email_type = "badge"
+
+    # Get All Donors
+    donors = supabase.table("Donations").select("donor_id").filter("campaign_id", "eq", campaign.get('campaign_id')).execute()
+
+    for donor in donors.data:
+        donor_id = donor['donor_id']  
+        donor_response = requests.get(f"http://127.0.0.1:8081/donor/{donor_id}").json() 
+        donor_data = donor_response.get("data", [{}])[0] if donor_response.get("data") else {}
+        
+        context = {
+            "donor_name": donor_data.get("name", "Valued Donor"),
+            "badge_earned": campaign.get("badge"),
+            "campaign_name": campaign.get("name"),
+        }
+        
+        # Send email to this donor
+        try:
+            email_payload = {
+                "to_email": donor_data.get("email"),
+                "email_type": email_type,
+                "context": context
+            }
+            
+            email_response = requests.post("http://127.0.0.1:8087/email/send-email", json=email_payload)
+            if email_response.status_code == 200:
+                logger.info(f"✅ Badge email sent to {donor_data.get('name', 'Unknown')} ({donor_data.get('email')})")
+            else:
+                logger.error(f"❌ Failed to send badge email to {donor_data.get('email')}: {email_response.text}")
+                
+        except Exception as email_error:
+            logger.error(f"❌ Error sending email to donor {donor_id}: {str(email_error)}")
+
 
 if __name__ == "__main__":
     try:
