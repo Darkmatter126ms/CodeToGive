@@ -33,3 +33,4 @@ coverage
 .env
 
 ./backend/venv
+/backend/campaign/__pycache__

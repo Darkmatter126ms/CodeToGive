@@ -485,7 +485,7 @@ function tierText(amount){
         <h2 class="text-shadow">Join our community of changemakers</h2>
         <p class="mt-3 opacity-90">Every gift matters. See your name climb the board as your impact grows.</p>
         <div class="mt-6">
-          <button class="btn-donate">Make a Donation</button>
+          <a href="/donate?[]" class="btn-donate">Make a Donation</a> <!--add code here!-->
         </div>
       </div>
     </section>

@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LandingPage from '../views/LandingPage.vue'
-import ViewCampaigns from '@/views/ViewCampaigns.vue'
-import EditCampaigns from '@/views/EditCampaigns.vue'
-import Leaderboard from '@/views/Leaderboard.vue'
-import PaymentPage from '@/views/PaymentPage.vue'
+import ViewCampaigns from '../views/ViewCampaigns.vue'
+import EditCampaigns from '../views/EditCampaigns.vue'
+import Leaderboard from '../views/Leaderboard.vue'
+import PaymentPage from '../views/PaymentPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

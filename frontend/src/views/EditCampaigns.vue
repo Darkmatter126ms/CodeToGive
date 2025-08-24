@@ -1,7 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
-// Stock photos pool for random campaign images
+// API Configuration
+const API_BASE_URL = 'http://localhost:8080/campaign'
+
+// Stock photos pool for random campaign images (fallback for display)
 const stockPhotos = [
   "https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=80&w=1600", // School building
   "https://images.unsplash.com/photo-1580582932707-520aed937b7b?q=80&w=1600", // Students studying
@@ -13,77 +16,10 @@ const stockPhotos = [
   "https://images.unsplash.com/photo-1588072432836-e10032774350?q=80&w=1600", // School cafeteria
 ]
 
-// Mock campaign data with Hong Kong schools/locations
-const campaigns = ref([
-  {
-    id: 1,
-    name: "Emergency Relief Fund",
-    description: "Supporting families affected by recent typhoon damage in Tin Shui Wai district.",
-    schoolName: "Tin Shui Wai Primary School",
-    image: stockPhotos[0],
-    startDate: "2025-01-15",
-    endDate: "2025-03-15",
-    raised: 18500,
-    goal: 25000,
-    schoolLogo: "https://images.unsplash.com/photo-1562813733-b31f71025d54?q=80&w=400",
-    badgeImage: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=400",
-    urgency: "high",
-    supporters: 127,
-    status: "open",
-    newsletterSent: false
-  },
-  {
-    id: 2,
-    name: "Digital Learning Initiative",
-    description: "Providing tablets and internet access for remote learning in Sham Shui Po.",
-    schoolName: "Sham Shui Po Community School",
-    image: stockPhotos[2],
-    startDate: "2024-12-01",
-    endDate: "2025-04-30",
-    raised: 42300,
-    goal: 60000,
-    schoolLogo: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=80&w=400",
-    badgeImage: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=80&w=400",
-    urgency: "medium",
-    supporters: 289,
-    status: "open",
-    newsletterSent: false
-  },
-  {
-    id: 3,
-    name: "School Lunch Program",
-    description: "Ensuring nutritious meals for underprivileged students in Kwun Tong area.",
-    schoolName: "Kwun Tong Secondary School",
-    image: stockPhotos[7],
-    startDate: "2024-11-01",
-    endDate: "2024-12-31",
-    raised: 35000,
-    goal: 35000,
-    schoolLogo: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?q=80&w=400",
-    badgeImage: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?q=80&w=400",
-    urgency: "low",
-    supporters: 164,
-    status: "finished",
-    newsletterSent: false
-  },
-  {
-    id: 4,
-    name: "After School Care",
-    description: "Extended childcare support for working parents in Tuen Mun district.",
-    schoolName: "Tuen Mun International School",
-    image: stockPhotos[5],
-    startDate: "2024-09-01",
-    endDate: "2024-11-30",
-    raised: 28000,
-    goal: 30000,
-    schoolLogo: "https://images.unsplash.com/photo-1562813733-b31f71025d54?q=80&w=400",
-    badgeImage: "https://images.unsplash.com/photo-1562813733-b31f71025d54?q=80&w=400",
-    urgency: "medium",
-    supporters: 89,
-    status: "closed",
-    newsletterSent: true
-  }
-])
+// Reactive data
+const campaigns = ref([])
+const loading = ref(false)
+const error = ref(null)
 
 // Tab management
 const activeTab = ref('open')
@@ -96,14 +32,23 @@ const tabs = [
 // Form state
 const showCreateForm = ref(false)
 const showBadgeGenerator = ref(false)
+const showNewsletterModal = ref(false)
 const editingCampaign = ref(null)
+const newsletterCampaign = ref(null)
 const formData = ref({
   name: '',
   description: '',
-  endDate: '',
-  goal: '',
+  end_date: '',
+  goal_amount: '',
   schoolLogo: null,
   schoolLogoPreview: ''
+})
+
+// Newsletter form state
+const newsletterData = ref({
+  caption: '',
+  image: null,
+  imagePreview: ''
 })
 
 // Badge generation state
@@ -122,9 +67,15 @@ const isGeneratingBadge = ref(false)
 const isFormValid = computed(() => {
   return formData.value.name.trim() && 
          formData.value.description.trim() && 
-         formData.value.endDate && 
-         formData.value.goal > 0 &&
+         formData.value.end_date && 
+         formData.value.goal_amount > 0 &&
          formData.value.schoolLogo
+})
+
+// Newsletter form validation
+const isNewsletterFormValid = computed(() => {
+  return newsletterData.value.caption.trim() && 
+         newsletterData.value.image
 })
 
 // Filtered campaigns based on active tab
@@ -141,7 +92,201 @@ const filteredCampaigns = computed(() => {
   })
 })
 
-// Functions
+// API Functions
+async function fetchCampaigns() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/`)
+    const result = await response.json()
+    
+    if (result.status === 'success') {
+      // Transform backend data to frontend format
+      campaigns.value = result.data.map(campaign => ({
+        id: campaign.campaign_id,
+        name: campaign.name,
+        description: campaign.description,
+        schoolName: `${campaign.name} School`, // You might want to add this field to your backend
+        image: stockPhotos[Math.floor(Math.random() * stockPhotos.length)], // Random stock photo for display
+        startDate: campaign.created_at ? campaign.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        endDate: campaign.end_date,
+        raised: campaign.raised_amount || 0,
+        goal: campaign.goal_amount || 0,
+        schoolLogo: campaign.school_logo,
+        badgeImage: campaign.badge,
+        urgency: getUrgencyFromStatus(campaign.status),
+        supporters: Math.floor(Math.random() * 300) + 50, // Mock data - you might want to add this to backend
+        status: campaign.status,
+        newsletterSent: campaign.status === 'closed'
+      }))
+    } else {
+      error.value = result.message || 'Failed to fetch campaigns'
+    }
+  } catch (err) {
+    error.value = 'Network error: ' + err.message
+    console.error('Error fetching campaigns:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function createCampaign() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const formDataToSend = new FormData()
+    formDataToSend.append('name', formData.value.name)
+    formDataToSend.append('description', formData.value.description)
+    formDataToSend.append('status', 'open')
+    formDataToSend.append('goal_amount', formData.value.goal_amount)
+    formDataToSend.append('end_date', formData.value.end_date)
+    
+    if (formData.value.schoolLogo) {
+      formDataToSend.append('file', formData.value.schoolLogo)
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/`, {
+      method: 'POST',
+      body: formDataToSend
+    })
+    
+    const result = await response.json()
+    
+    if (result.status === 'success') {
+      // Refresh campaigns list
+      await fetchCampaigns()
+      cancelEdit()
+    } else {
+      error.value = result.message || 'Failed to create campaign'
+    }
+  } catch (err) {
+    error.value = 'Network error: ' + err.message
+    console.error('Error creating campaign:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function generateBadgeForCampaign(campaignId) {
+  isGeneratingBadge.value = true
+  error.value = null
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/generate-badge/${campaignId}`, {
+      method: 'PUT'
+    })
+    
+    const result = await response.json()
+    
+    if (result.status === 'success') {
+      generatedBadge.value = {
+        theme: selectedTheme.value,
+        schoolLogo: formData.value.schoolLogoPreview,
+        colors: badgeThemes.find(t => t.id === selectedTheme.value).colors,
+        timestamp: Date.now(),
+        url: result.badge
+      }
+      
+      // Refresh campaigns to show updated badge
+      await fetchCampaigns()
+    } else {
+      error.value = result.message || 'Failed to generate badge'
+    }
+  } catch (err) {
+    error.value = 'Network error: ' + err.message
+    console.error('Error generating badge:', err)
+  } finally {
+    isGeneratingBadge.value = false
+  }
+}
+
+async function deleteCampaignAPI(campaignId) {
+  if (!confirm('Are you sure you want to delete this campaign?')) return
+  
+  loading.value = true
+  error.value = null
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/${campaignId}`, {
+      method: 'DELETE'
+    })
+    
+    const result = await response.json()
+    
+    if (result.status === 'success') {
+      // Refresh campaigns list
+      await fetchCampaigns()
+    } else {
+      error.value = result.message || 'Failed to delete campaign'
+    }
+  } catch (err) {
+    error.value = 'Network error: ' + err.message
+    console.error('Error deleting campaign:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function updateCampaignStatus(campaignId, newStatus) {
+  loading.value = true
+  error.value = null
+
+  try {
+    const current = campaigns.value.find(c => c.id === campaignId)
+
+    const formDataToSend = new FormData()
+    formDataToSend.append('status', newStatus)
+
+    // Include existing values so backend doesn't overwrite with null/empty
+    if (current) {
+      formDataToSend.append('name', current.name || '')
+      formDataToSend.append('description', current.description || '')
+      formDataToSend.append('goal_amount', current.goal ?? 0)
+      formDataToSend.append('end_date', current.endDate || '')
+      // Only include a file if you're actually updating it:
+      // formDataToSend.append('file', <File>)  // leave out otherwise
+    }
+
+    const res = await fetch(`${API_BASE_URL}/${campaignId}`, {
+      method: 'PUT',
+      body: formDataToSend
+    })
+
+    // Be defensive when parsing the response
+    const text = await res.text()
+    let result
+    try {
+      result = JSON.parse(text)
+    } catch {
+      throw new Error(`Server returned ${res.status}. Body: ${text.slice(0, 200)}`)
+    }
+
+    if (!res.ok || result.status !== 'success') {
+      throw new Error(result.message || `Update failed with status ${res.status}`)
+    }
+
+    await fetchCampaigns()
+  } catch (err) {
+    error.value = String(err.message || err)
+    console.error('Error updating campaign:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Helper functions
+function getUrgencyFromStatus(status) {
+  switch(status) {
+    case 'open': return 'medium'
+    case 'finished': return 'low'
+    case 'closed': return 'high'
+    default: return 'medium'
+  }
+}
+
+// Existing helper functions (unchanged)
 function setActiveTab(tabId) {
   activeTab.value = tabId
 }
@@ -156,20 +301,37 @@ function resetForm() {
   formData.value = {
     name: '',
     description: '',
-    endDate: '',
-    goal: '',
+    end_date: '',
+    goal_amount: '',
     schoolLogo: null,
     schoolLogoPreview: ''
   }
   generatedBadge.value = null
   selectedTheme.value = 'cute'
+  error.value = null
+}
+
+function resetNewsletterForm() {
+  newsletterData.value = {
+    caption: '',
+    image: null,
+    imagePreview: ''
+  }
 }
 
 function cancelEdit() {
   showCreateForm.value = false
   showBadgeGenerator.value = false
+  showNewsletterModal.value = false
   editingCampaign.value = null
+  newsletterCampaign.value = null
   resetForm()
+  resetNewsletterForm()
+  
+  // Clear URL parameters when canceling
+  if (window.location.search) {
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }
 }
 
 function handleSchoolLogoUpload(event) {
@@ -186,6 +348,20 @@ function handleSchoolLogoUpload(event) {
   }
 }
 
+function handleNewsletterImageUpload(event) {
+  const file = event.target.files[0]
+  if (file) {
+    newsletterData.value.image = file
+    
+    // Create preview URL
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      newsletterData.value.imagePreview = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
 function proceedToBadgeGeneration() {
   if (!isFormValid.value) return
   showCreateForm.value = false
@@ -194,7 +370,7 @@ function proceedToBadgeGeneration() {
 
 function selectTheme(themeId) {
   selectedTheme.value = themeId
-  generatedBadge.value = null // Reset generated badge when theme changes
+  generatedBadge.value = null
 }
 
 function generateBadge() {
@@ -202,11 +378,10 @@ function generateBadge() {
   
   isGeneratingBadge.value = true
   
-  // Simulate badge generation with a delay
+  // Simulate badge generation with a delay (will be replaced with actual API call after campaign creation)
   setTimeout(() => {
     const theme = badgeThemes.find(t => t.id === selectedTheme.value)
     
-    // Create a simple badge representation (in a real app, this would be more sophisticated)
     generatedBadge.value = {
       theme: selectedTheme.value,
       schoolLogo: formData.value.schoolLogoPreview,
@@ -218,50 +393,64 @@ function generateBadge() {
   }, 2000)
 }
 
-function saveBadgeAndCreateCampaign() {
-  if (!generatedBadge.value) return
+async function saveBadgeAndCreateCampaign() {
+  if (!generatedBadge.value && !isFormValid.value) return
   
-  const randomImage = stockPhotos[Math.floor(Math.random() * stockPhotos.length)]
-  const currentDate = new Date().toISOString().split('T')[0]
-  
-  const newCampaign = {
-    id: Date.now(),
-    name: formData.value.name,
-    description: formData.value.description,
-    schoolName: `${formData.value.name} School`, // Could be extracted or separate field
-    image: randomImage,
-    startDate: currentDate,
-    endDate: formData.value.endDate,
-    goal: Number(formData.value.goal),
-    raised: 0,
-    supporters: 0,
-    status: 'open',
-    schoolLogo: formData.value.schoolLogoPreview,
-    badgeImage: generatedBadge.value, // In real app, this would be saved image URL
-    urgency: 'medium',
-    newsletterSent: false
-  }
-  
-  campaigns.value.push(newCampaign)
-  cancelEdit()
+  // First create the campaign
+  await createCampaign()
 }
 
 function deleteCampaign(campaignId) {
-  if (confirm('Are you sure you want to delete this campaign?')) {
-    campaigns.value = campaigns.value.filter(c => c.id !== campaignId)
-  }
+  deleteCampaignAPI(campaignId)
 }
 
 function markAsFinished(campaign) {
-  campaign.status = 'finished'
+  updateCampaignStatus(campaign.id, 'finished')
 }
 
 function sendNewsletter(campaign) {
-  // Simulate sending newsletter
-  setTimeout(() => {
-    campaign.status = 'closed'
-    campaign.newsletterSent = true
-  }, 1000)
+  // Set the campaign for newsletter and show modal
+  newsletterCampaign.value = campaign
+  showNewsletterModal.value = true
+  resetNewsletterForm()
+  
+  // Update URL to show campaign ID
+  const url = new URL(window.location)
+  url.searchParams.set('campaign', campaign.id)
+  window.history.pushState({}, '', url)
+}
+
+async function submitNewsletter() {
+  if (!isNewsletterFormValid.value || !newsletterCampaign.value) return
+  
+  loading.value = true
+  error.value = null
+  
+  try {
+    // For now, we'll just simulate newsletter sending and then close the campaign
+    // In a real implementation, you would send the newsletter data to your backend
+    
+    // You could extend your campaign.py to have a newsletter endpoint like:
+    // POST /campaign/{id}/newsletter with caption and image
+    
+    // For now, we'll just update the campaign status to closed
+    await updateCampaignStatus(newsletterCampaign.value.id, 'closed')
+    
+    // Close modal and clear URL params
+    showNewsletterModal.value = false
+    newsletterCampaign.value = null
+    resetNewsletterForm()
+    
+    if (window.location.search) {
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+    
+  } catch (err) {
+    error.value = 'Failed to send newsletter: ' + err.message
+    console.error('Error sending newsletter:', err)
+  } finally {
+    loading.value = false
+  }
 }
 
 function formatAmount(amount) {
@@ -296,9 +485,130 @@ function getStatusBadgeClass(status) {
 function isDatePassed(dateString) {
   return new Date(dateString) < new Date()
 }
-</script>
 
+// Lifecycle hooks
+onMounted(() => {
+  fetchCampaigns()
+  
+  // Check for campaign parameter in URL on page load
+  const urlParams = new URLSearchParams(window.location.search)
+  const campaignId = urlParams.get('campaign')
+  if (campaignId) {
+    // Find the campaign and show newsletter modal if it exists and is finished
+    const campaign = campaigns.value.find(c => c.id === parseInt(campaignId))
+    if (campaign && campaign.status === 'finished') {
+      sendNewsletter(campaign)
+    }
+  }
+})
+</script>
 <template>
+  <!-- ERROR ALERT -->
+  <div v-if="error" class="error-alert" style="background: linear-gradient(145deg, #fef2f2, #fff); border: 2px solid #dc2626; color: #dc2626; padding: 1rem 2rem; border-radius: 16px; margin: 1rem auto; max-width: 1200px; text-align: center; font-weight: 600; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);">
+    ⚠️ {{ error }}
+    <button @click="error = null" style="margin-left: 1rem; background: none; border: none; color: #dc2626; font-weight: 700; cursor: pointer;">✕</button>
+  </div>
+
+  <!-- LOADING OVERLAY -->
+  <div v-if="loading" class="loading-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="loading-content" style="background: white; padding: 2rem; border-radius: 20px; text-align: center; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);">
+      <div class="spinner" style="width: 60px; height: 60px; margin: 0 auto 1rem; border: 4px solid #e2e8f0; border-top: 4px solid #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <p style="font-weight: 600; color: #1e293b;">Loading...</p>
+    </div>
+  </div>
+
+  <!-- NEWSLETTER MODAL -->
+  <div v-if="showNewsletterModal" class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 1rem;">
+    <div class="modal-content" style="background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header" style="padding: 2rem 2rem 1rem; border-bottom: 2px solid #f1f5f9; text-align: center;">
+        <h2 style="color: #1e293b; margin-bottom: 0.5rem; font-weight: 700;">Send Newsletter</h2>
+        <div class="trust-badge urgent-medium">Campaign ID: {{ newsletterCampaign?.id }}</div>
+        <p style="margin-top: 1rem; color: #64748b;">Create a newsletter for: <strong>{{ newsletterCampaign?.name }}</strong></p>
+      </div>
+      
+      <div class="modal-body" style="padding: 2rem;">
+        <form @submit.prevent="submitNewsletter" class="space-y-6">
+          <!-- Caption -->
+          <div>
+            <label class="form-label">Newsletter Caption *</label>
+            <textarea
+              v-model="newsletterData.caption"
+              class="form-input w-full"
+              rows="4"
+              placeholder="Write your newsletter message to supporters..."
+              :disabled="loading"
+              required
+            ></textarea>
+            <p style="font-size: 0.875rem; color: #64748b; margin-top: 0.5rem;">This message will be sent to all campaign supporters.</p>
+          </div>
+
+          <!-- Image Upload -->
+          <div>
+            <label class="form-label">Newsletter Image *</label>
+            <div class="file-upload-zone">
+              <input
+                type="file"
+                accept="image/*"
+                @change="handleNewsletterImageUpload"
+                class="file-input"
+                id="newsletterImage"
+                :disabled="loading"
+                required
+                style="position: absolute; opacity: 0; width: 0; height: 0;"
+              />
+              <label for="newsletterImage" class="file-upload-content">
+                <div v-if="!newsletterData.imagePreview" class="upload-placeholder">
+                  <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px; margin: 0 auto 1rem; color: #8b5cf6;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <p class="file-upload-text" style="font-weight: 600; color: #1e293b; margin-bottom: 0.5rem;">Click to upload newsletter image</p>
+                  <p class="file-upload-hint" style="font-size: 0.875rem; color: #64748b;">PNG, JPG up to 5MB</p>
+                </div>
+                <div v-else class="image-preview" style="text-align: center;">
+                  <img :src="newsletterData.imagePreview" alt="Newsletter image preview" style="width: 200px; height: 150px; object-fit: cover; border-radius: 12px; border: 3px solid #22c55e; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2); margin-bottom: 0.75rem;" />
+                  <p class="image-uploaded" style="color: #22c55e; font-weight: 600; font-size: 0.9rem;">Image uploaded ✓</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Campaign Info Display -->
+          <div class="impact-highlight" style="background: linear-gradient(145deg, #f0fdf4, #f0fdf9); border-left: 5px solid #22c55e; padding: 1.5rem 2rem; border-radius: 0 15px 15px 0; margin: 1.5rem 0; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.1);">
+            <h4 style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">Campaign Summary</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem; color: #475569;">
+              <div><strong>Goal:</strong> {{ formatAmount(newsletterCampaign?.goal || 0) }}</div>
+              <div><strong>Raised:</strong> {{ formatAmount(newsletterCampaign?.raised || 0) }}</div>
+              <div><strong>Supporters:</strong> {{ newsletterCampaign?.supporters || 0 }}</div>
+              <div><strong>Progress:</strong> {{ Math.round(getProgressPercentage(newsletterCampaign?.raised || 0, newsletterCampaign?.goal || 1)) }}%</div>
+            </div>
+          </div>
+        </form>
+      </div>
+      
+      <div class="modal-footer" style="padding: 1rem 2rem 2rem; display: flex; gap: 1rem; justify-content: center;">
+        <button
+          @click="submitNewsletter"
+          type="button"
+          class="btn-donate"
+          :class="{ 'opacity-50': !isNewsletterFormValid || loading }"
+          :disabled="!isNewsletterFormValid || loading"
+          style="flex: 1; max-width: 200px;"
+        >
+          {{ loading ? 'Sending...' : 'Send Newsletter' }}
+        </button>
+        <button
+          @click="cancelEdit"
+          type="button"
+          class="btn-secondary"
+          :disabled="loading"
+          style="flex: 1; max-width: 200px;"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- HEADER -->
   <header class="hero-gradient hero-pattern">
     <div class="container py-20 md:py-28">
@@ -315,8 +625,8 @@ function isDatePassed(dateString) {
           <button 
             @click="createNewCampaign"
             class="btn-donate"
-            :class="{ 'opacity-50': showCreateForm || showBadgeGenerator }"
-            :disabled="showCreateForm || showBadgeGenerator"
+            :class="{ 'opacity-50': showCreateForm || showBadgeGenerator || showNewsletterModal || loading }"
+            :disabled="showCreateForm || showBadgeGenerator || showNewsletterModal || loading"
           >
             + Create New Campaign
           </button>
@@ -367,7 +677,7 @@ function isDatePassed(dateString) {
               <div>
                 <label class="form-label">Goal Amount (HKD) *</label>
                 <input
-                  v-model="formData.goal"
+                  v-model="formData.goal_amount"
                   type="number"
                   min="1"
                   class="form-input w-full"
@@ -378,7 +688,7 @@ function isDatePassed(dateString) {
               <div>
                 <label class="form-label">End Date *</label>
                 <input
-                  v-model="formData.endDate"
+                  v-model="formData.end_date"
                   type="date"
                   class="form-input w-full"
                   :min="new Date().toISOString().split('T')[0]"
@@ -402,11 +712,11 @@ function isDatePassed(dateString) {
                 />
                 <label for="schoolLogo" class="file-upload-content">
                   <div v-if="!formData.schoolLogoPreview" class="upload-placeholder">
-                    <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px; margin: 0 auto 1rem; color: #8b5cf6;">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
-                    <p class="file-upload-text">Click to upload school logo</p>
-                    <p class="file-upload-hint">PNG, JPG up to 5MB</p>
+                    <p class="file-upload-text" style="font-weight: 600; color: #1e293b; margin-bottom: 0.5rem;">Click to upload school logo</p>
+                    <p class="file-upload-hint" style="font-size: 0.875rem; color: #64748b;">PNG, JPG up to 5MB</p>
                   </div>
                   <div v-else class="logo-preview">
                     <img :src="formData.schoolLogoPreview" alt="School logo preview" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 3px solid #22c55e; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2); margin-bottom: 0.75rem;" />
@@ -421,15 +731,16 @@ function isDatePassed(dateString) {
               <button
                 type="submit"
                 class="btn-donate"
-                :class="{ 'opacity-50': !isFormValid }"
-                :disabled="!isFormValid"
+                :class="{ 'opacity-50': !isFormValid || loading }"
+                :disabled="!isFormValid || loading"
               >
-                Next: Generate Badge
+                {{ loading ? 'Creating...' : 'Create Campaign' }}
               </button>
               <button
                 type="button"
                 @click="cancelEdit"
                 class="btn-secondary"
+                :disabled="loading"
               >
                 Cancel
               </button>
@@ -469,7 +780,7 @@ function isDatePassed(dateString) {
                 </div>
 
                 <div v-else class="generated-badge" :style="{ background: `linear-gradient(135deg, ${generatedBadge.colors[0]}, ${generatedBadge.colors[1]})`, width: '200px', height: '200px', borderRadius: '20px', padding: '1.5rem', color: 'white', boxShadow: '0 12px 36px rgba(0, 0, 0, 0.15)', border: '3px solid rgba(255, 255, 255, 0.3)', position: 'relative', overflow: 'hidden' }">
-                  <div class="badge-content" style="position: relative; z-index: 2; display: flex; flex-direction: 'column'; align-items: 'center'; justify-content: 'center'; height: '100%'; text-align: 'center';">
+                  <div class="badge-content" style="position: relative; z-index: 2; display: flex; flexDirection: 'column'; alignItems: 'center'; justifyContent: 'center'; height: '100%'; textAlign: 'center';">
                     <img :src="generatedBadge.schoolLogo" alt="School logo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);" />
                     <div class="badge-text">
                       <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">{{ formData.name }}</h4>
@@ -502,8 +813,8 @@ function isDatePassed(dateString) {
                   @click="generateBadge"
                   type="button"
                   class="btn-donate w-full"
-                  :disabled="!formData.schoolLogoPreview || isGeneratingBadge"
-                  :class="{ 'opacity-50': !formData.schoolLogoPreview || isGeneratingBadge }"
+                  :disabled="!formData.schoolLogoPreview || isGeneratingBadge || loading"
+                  :class="{ 'opacity-50': !formData.schoolLogoPreview || isGeneratingBadge || loading }"
                 >
                   {{ isGeneratingBadge ? 'Generating...' : 'Generate Badge' }}
                 </button>
@@ -513,14 +824,16 @@ function isDatePassed(dateString) {
                   @click="saveBadgeAndCreateCampaign"
                   type="button"
                   class="action-btn secondary w-full"
+                  :disabled="loading"
                 >
-                  Save Badge & Create Campaign
+                  {{ loading ? 'Creating Campaign...' : 'Create Campaign' }}
                 </button>
 
                 <button
                   @click="cancelEdit"
                   type="button"
                   class="action-btn danger w-full"
+                  :disabled="loading"
                 >
                   Cancel
                 </button>
@@ -533,7 +846,7 @@ function isDatePassed(dateString) {
   </section>
 
   <!-- TABS NAVIGATION -->
-  <section v-if="!showCreateForm && !showBadgeGenerator" class="section-light">
+  <section v-if="!showCreateForm && !showBadgeGenerator && !showNewsletterModal" class="section-light">
     <div class="container py-8">
       <div class="tab-navigation">
         <button
@@ -551,7 +864,7 @@ function isDatePassed(dateString) {
   </section>
 
   <!-- CAMPAIGNS LIST -->
-  <section v-if="!showCreateForm && !showBadgeGenerator" class="section-white">
+  <section v-if="!showCreateForm && !showBadgeGenerator && !showNewsletterModal" class="section-white">
     <div class="container py-20">
       <div class="text-center mb-12">
         <h2 class="text-slate-900 mb-2">{{ tabs.find(t => t.id === activeTab)?.label }}</h2>
@@ -575,7 +888,7 @@ function isDatePassed(dateString) {
               <span class="trust-badge" :class="getStatusBadgeClass(campaign.status)">
                 {{ campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1) }}
               </span>
-              <div class="school-logo-badge">
+              <div class="school-logo-badge" v-if="campaign.schoolLogo">
                 <img :src="campaign.schoolLogo" alt="School logo" class="badge-preview-image" />
               </div>
             </div>
@@ -629,12 +942,14 @@ function isDatePassed(dateString) {
                   @click="markAsFinished(campaign)"
                   class="campaign-action-btn secondary"
                   v-if="isDatePassed(campaign.endDate)"
+                  :disabled="loading"
                 >
                   Mark Finished
                 </button>
                 <button 
                   @click="deleteCampaign(campaign.id)"
                   class="campaign-action-btn danger"
+                  :disabled="loading"
                 >
                   Delete
                 </button>
@@ -644,12 +959,14 @@ function isDatePassed(dateString) {
                 <button 
                   @click="sendNewsletter(campaign)"
                   class="campaign-action-btn primary"
+                  :disabled="loading"
                 >
                   Send Newsletter
                 </button>
                 <button 
                   @click="deleteCampaign(campaign.id)"
                   class="campaign-action-btn danger"
+                  :disabled="loading"
                 >
                   Delete
                 </button>
@@ -660,6 +977,7 @@ function isDatePassed(dateString) {
                 <button 
                   @click="deleteCampaign(campaign.id)"
                   class="campaign-action-btn danger"
+                  :disabled="loading"
                 >
                   Delete Campaign
                 </button>
@@ -678,7 +996,7 @@ function isDatePassed(dateString) {
         <p class="text-slate-600 mb-6">
           {{ activeTab === 'open' ? 'Create your first campaign to begin raising funds for Hong Kong schools.' : `Check back later for ${activeTab} campaigns.` }}
         </p>
-        <button v-if="activeTab === 'open'" @click="createNewCampaign" class="btn-donate">
+        <button v-if="activeTab === 'open'" @click="createNewCampaign" class="btn-donate" :disabled="loading">
           Create Your First Campaign
         </button>
       </div>
@@ -686,7 +1004,7 @@ function isDatePassed(dateString) {
   </section>
 
   <!-- STATISTICS SUMMARY -->
-  <section v-if="!showCreateForm && !showBadgeGenerator" class="section-gradient">
+  <section v-if="!showCreateForm && !showBadgeGenerator && !showNewsletterModal" class="section-gradient">
     <div class="container py-16">
       <div class="text-center">
         <h2 class="text-slate-900">Hong Kong Campaign Statistics</h2>
@@ -702,7 +1020,7 @@ function isDatePassed(dateString) {
             <p>Active Campaigns</p>
           </div>
           <div class="stat-card">
-            <div class="stat-number">{{ formatAmount(campaigns.reduce((sum, c) => sum + c.raised, 0)).replace('$', 'HK$') }}</div>
+            <div class="stat-number">{{ formatAmount(campaigns.reduce((sum, c) => sum + c.raised, 0)).replace('$', '$HK') }}</div>
             <p>Total Raised</p>
           </div>
           <div class="stat-card">
@@ -985,7 +1303,7 @@ function isDatePassed(dateString) {
   background: linear-gradient(145deg, #faf5ff, #fff);
 }
 
-.campaign-action-btn.secondary:hover {
+.campaign-action-btn.secondary:hover:not(:disabled) {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: white;
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
@@ -998,7 +1316,7 @@ function isDatePassed(dateString) {
   background: linear-gradient(145deg, #fef2f2, #fff);
 }
 
-.campaign-action-btn.danger:hover {
+.campaign-action-btn.danger:hover:not(:disabled) {
   background: linear-gradient(135deg, #dc2626, #b91c1c);
   color: white;
   box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
@@ -1024,6 +1342,167 @@ function isDatePassed(dateString) {
   border-color: #cbd5e1 !important;
   color: #475569 !important;
   background: #f8fafc !important;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+}
+
+/* Error alert */
+.error-alert {
+  background: linear-gradient(145deg, #fef2f2, #fff);
+  border: 2px solid #dc2626;
+  color: #dc2626;
+  padding: 1rem 2rem;
+  border-radius: 16px;
+  margin: 1rem auto;
+  max-width: 1200px;
+  text-align: center;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+  position: relative;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  padding: 2rem 2rem 1rem;
+  border-bottom: 2px solid #f1f5f9;
+  text-align: center;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.modal-footer {
+  padding: 1rem 2rem 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+/* Enhanced file upload styling for newsletter */
+.file-upload-content {
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-placeholder, .image-preview {
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Action buttons */
+.action-btn {
+  background: white;
+  border: 2px solid #e2e8f0;
+  color: #64748b;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn.secondary {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: linear-gradient(145deg, #faf5ff, #fff);
+}
+
+.action-btn.secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+}
+
+.action-btn.danger {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: linear-gradient(145deg, #fef2f2, #fff);
+}
+
+.action-btn.danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
 }
 
 /* Responsive adjustments */
@@ -1070,13 +1549,32 @@ function isDatePassed(dateString) {
     font-size: 0.85rem;
     padding: 0.625rem 0.875rem;
   }
+  
+  .modal-content {
+    margin: 0.5rem;
+    max-height: 95vh;
+  }
+  
+  .modal-header, .modal-body, .modal-footer {
+    padding: 1rem;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .action-btn {
+    font-size: 0.85rem;
+    padding: 0.625rem 0.875rem;
+  }
 }
 
 /* Enhanced accessibility */
 .campaign-action-btn:focus,
 .tab-item:focus,
 .theme-option:focus,
-.form-input:focus {
+.form-input:focus,
+.action-btn:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
 }
@@ -1096,6 +1594,10 @@ function isDatePassed(dateString) {
   }
   
   .story-card.campaign-card {
+    animation: none;
+  }
+  
+  .modal-content {
     animation: none;
   }
 }
