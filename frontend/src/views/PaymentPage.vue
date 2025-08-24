@@ -1,284 +1,306 @@
-<script setup>
-import { ref, computed } from 'vue'
-import { paymentAPI } from '@/services/api'
+<script>
+import { ref, computed, onMounted } from "vue";
+import { loadStripe } from "@stripe/stripe-js";
+import axios from "axios";
 
-// Payment type selection
-const paymentType = ref('one-time') // 'one-time' or 'subscription'
+export default {
+  data() {
+    return {
+      publishableKey:
+        "pk_test_51Rz3MGHFWfzbh85tTZOD9DWZxquKZ1afy4HRYpd6tJStNRqI013Y551VHX9BV6HW4oBjAUJgugD7oKvK3YLM1vpO00mn3W5fir",
+      stripe: null,
+      elements: null,
+      cardElement: null,
+      amount: 50,
+      cardError: "",
+      isLoading: false,
+      paymentSuccess: false,
+      paymentError: "",
+      campaigns: [
+        {
+          id: 1,
+          title: "Emergency School Meals",
+          description:
+            "Provide nutritious meals to children affected by recent floods",
+          image:
+            "https://images.unsplash.com/photo-1498721406610-899c1d4eb77d?q=80&w=400",
+        },
+        {
+          id: 2,
+          title: "Digital Learning Kits",
+          description:
+            "Tablets and educational apps for children in remote areas",
+          image:
+            "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400",
+        },
+        {
+          id: 3,
+          title: "Safe Play Spaces",
+          description:
+            "Building secure playgrounds in underserved neighborhoods",
+          image:
+            "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?q=80&w=400",
+        },
+      ],
+      // Payment type selection
+      paymentType: "one-time", // 'one-time' or 'subscription'
 
-// One-time donation amounts
-const selectedAmount = ref(50)
-const predefinedAmounts = [25, 50, 100, 250]
-const customAmount = ref('')
-const useCustomAmount = ref(false)
+      // One-time donation amounts
+      selectedAmount: 50,
+      predefinedAmounts: [25, 50, 100, 250],
+      customAmount: "",
+      useCustomAmount: false,
 
-// Subscription plans (matching backend plans)
-const subscriptionPlans = ref([
-  {
-    id: 'supporter',
-    name: 'Supporter',
-    price: 60,
-    currency: 'USD',
-    interval: 'month',
-    features: [
-      'Monthly impact reports',
-      'Basic badge collection',
-      'Leaderboard access',
-      'Tax-deductible receipts'
-    ],
-    color: 'blue'
+      // Donor information
+      donorInfo: {
+        name: "",
+        email: "",
+      },
+
+      // Form validation
+      errors: {},
+
+      // Payment processing states
+      isLoading: false,
+      paymentSuccess: false,
+      paymentError: "",
+
+      // Campaign selection (automatically set to first campaign)
+      selectedCampaign: 0, // Always use the first campaign
+
+      // Stripe
+      stripe: null,
+      elements: null,
+      cardElement: null,
+    };
   },
-  {
-    id: 'advocate', 
-    name: 'Advocate',
-    price: 120,
-    currency: 'USD',
-    interval: 'month',
-    features: [
-      'Weekly impact reports',
-      'Advanced badge collection',
-      'Leaderboard access',
-      'Exclusive campaign access',
-      'Priority support'
-    ],
-    color: 'purple',
-    popular: true
+  computed: {
+    finalAmount() {
+      return this.useCustomAmount
+        ? parseFloat(this.customAmount) || 0
+        : this.selectedAmount;
+    },
+
+    isFormValid() {
+      return (
+        this.donorInfo.name &&
+        this.donorInfo.email &&
+        this.finalAmount > 0 &&
+        !this.isLoading
+      );
+    },
   },
-  {
-    id: 'champion',
-    name: 'Champion', 
-    price: 500,
-    currency: 'USD',
-    interval: 'month',
-    features: [
-      'Real-time impact tracking',
-      'Premium badge collection',
-      'VIP leaderboard access',
-      'Personal impact reports',
-      'Direct contact with teams',
-      'Monthly video calls'
-    ],
-    color: 'gold'
-  }
-])
+  async mounted() {
+    console.log("PaymentPage mounted, initializing Stripe...");
+    console.log("Available campaigns:", this.campaigns);
 
-const selectedPlan = ref('advocate')
+    try {
+      console.log("Loading Stripe...");
+      // Load Stripe with your publishable key
+      this.stripe = await loadStripe(this.publishableKey);
 
-// Donor information
-const donorInfo = ref({
-  name: '',
-  email: ''
-})
+      this.elements = this.stripe.elements();
 
-// Card payment information
-const cardInfo = ref({
-  number: '',
-  expiry: '',
-  cvc: '',
-  name: ''
-})
-
-// Form validation
-const errors = ref({})
-
-// Payment processing states
-const isLoading = ref(false)
-const paymentSuccess = ref(false)
-const paymentError = ref('')
-
-// Campaign selection (optional)
-const selectedCampaign = ref(null)
-const campaigns = ref([
-  {
-    id: 1,
-    title: "Emergency School Meals",
-    description: "Provide nutritious meals to children affected by recent floods",
-    image: "https://images.unsplash.com/photo-1498721406610-899c1d4eb77d?q=80&w=400"
-  },
-  {
-    id: 2,
-    title: "Digital Learning Kits", 
-    description: "Tablets and educational apps for children in remote areas",
-    image: "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400"
-  },
-  {
-    id: 3,
-    title: "Safe Play Spaces",
-    description: "Building secure playgrounds in underserved neighborhoods", 
-    image: "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?q=80&w=400"
-  }
-])
-
-// Computed values
-const finalAmount = computed(() => {
-  if (paymentType.value === 'subscription') {
-    return subscriptionPlans.value.find(p => p.id === selectedPlan.value)?.price || 0
-  }
-  return useCustomAmount.value ? (parseInt(customAmount.value) || 0) : selectedAmount.value
-})
-
-const isFormValid = computed(() => {
-  return donorInfo.value.name && 
-         donorInfo.value.email && 
-         finalAmount.value > 0 &&
-         cardInfo.value.number.length >= 16 &&
-         cardInfo.value.expiry &&
-         cardInfo.value.cvc.length >= 3 &&
-         !isLoading.value
-})
-
-// Functions
-function selectAmount(amount) {
-  selectedAmount.value = amount
-  useCustomAmount.value = false
-  customAmount.value = ''
-}
-
-function selectCustomAmount() {
-  useCustomAmount.value = true
-}
-
-function selectPlan(planId) {
-  selectedPlan.value = planId
-}
-
-function formatCardNumber(value) {
-  return value.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim()
-}
-
-function formatExpiry(value) {
-  return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2')
-}
-
-function validateForm() {
-  errors.value = {}
-  
-  if (!donorInfo.value.name) errors.value.name = 'Name is required'
-  if (!donorInfo.value.email) errors.value.email = 'Email is required'
-  if (!cardInfo.value.number || cardInfo.value.number.replace(/\s/g, '').length < 16) {
-    errors.value.cardNumber = 'Valid card number is required'
-  }
-  if (!cardInfo.value.expiry) errors.value.expiry = 'Expiry date is required'
-  if (!cardInfo.value.cvc || cardInfo.value.cvc.length < 3) {
-    errors.value.cvc = 'Valid CVC is required'
-  }
-  
-  return Object.keys(errors.value).length === 0
-}
-
-async function processPayment() {
-  if (!validateForm()) return
-  
-  // Reset previous states
-  paymentError.value = ''
-  paymentSuccess.value = false
-  isLoading.value = true
-  
-  try {
-    if (paymentType.value === 'one-time') {
-      await processOneTimePayment()
-    } else {
-      await processSubscription()
+      // Setup card element
+      setTimeout(() => {
+        this.setupCardElement();
+      }, 100);
+    } catch (error) {
+      console.error("Error loading Stripe:", error);
     }
-    
-    // Payment successful
-    paymentSuccess.value = true
-    setTimeout(() => {
-      resetForm()
-      paymentSuccess.value = false
-    }, 3000) // Reset after 3 seconds
-    
-  } catch (error) {
-    console.error('Payment error:', error)
-    paymentError.value = error.response?.data?.error || 'Payment failed. Please try again.'
-  } finally {
-    isLoading.value = false
-  }
-}
+  },
+  methods: {
+    async setupCardElement() {
+      console.log("Setting up card element...");
 
-async function processOneTimePayment() {
-  const paymentData = {
-    amount: finalAmount.value,
-    email: donorInfo.value.email,
-    name: donorInfo.value.name,
-    campaign_id: selectedCampaign.value || null
-  }
-  
-  // Create payment intent
-  const response = await paymentAPI.createPaymentIntent(paymentData)
-  console.log('Payment intent created:', response.data)
-  
-  // Payment intent created successfully
-  console.log('✅ Payment processed successfully!')
-  console.log('💡 Note: Payment shows as "Incomplete" in Stripe (normal for test setup)')
-  
-  // Skip completion for now to avoid Stripe API issues
-  // In production, Stripe Elements + webhooks handle this automatically
-}
+      await this.$nextTick();
 
-async function processSubscription() {
-  const subscriptionData = {
-    plan_id: selectedPlan.value,
-    email: donorInfo.value.email,
-    name: donorInfo.value.name
-  }
-  
-  // Create subscription
-  const response = await paymentAPI.createSubscription(subscriptionData)
-  console.log('Subscription created:', response.data)
-}
+      const cardElementContainer = document.getElementById("card-element");
+      if (!cardElementContainer) {
+        console.error("Card element container not found!");
+        return;
+      }
 
-function resetForm() {
-  donorInfo.value = {
-    name: '',
-    email: ''
-  }
-  cardInfo.value = {
-    number: '',
-    expiry: '',
-    cvc: '',
-    name: ''
-  }
-  selectedAmount.value = 50
-  customAmount.value = ''
-  useCustomAmount.value = false
-  selectedCampaign.value = null
-  errors.value = {}
-  
-  // Reset payment states
-  isLoading.value = false
-  paymentSuccess.value = false
-  paymentError.value = ''
-}
+      if (!this.stripe || !this.elements) {
+        console.error("Stripe not initialized");
+        return;
+      }
 
-function formatAmount(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0
-  }).format(amount)
-}
+      // Clear any existing content
+      cardElementContainer.innerHTML = "";
 
-// Watch for card number formatting
-function onCardNumberInput(event) {
-  const formatted = formatCardNumber(event.target.value)
-  if (formatted.length <= 19) { // 16 digits + 3 spaces
-    cardInfo.value.number = formatted
-  }
-}
+      // Create card element
+      this.cardElement = this.elements.create("card", {
+        style: {
+          base: {
+            color: "#32325d",
+            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+            fontSmoothing: "antialiased",
+            fontSize: "16px",
+            "::placeholder": {
+              color: "#aab7c4",
+            },
+          },
+          invalid: {
+            color: "#fa755a",
+            iconColor: "#fa755a",
+          },
+        },
+        hidePostalCode: true,
+      });
 
-function onExpiryInput(event) {
-  const formatted = formatExpiry(event.target.value)
-  if (formatted.length <= 5) { // MM/YY
-    cardInfo.value.expiry = formatted
-  }
-}
+      try {
+        this.cardElement.mount("#card-element");
+        console.log("✅ Card element mounted successfully");
 
-function onCvcInput(event) {
-  const value = event.target.value.replace(/\D/g, '')
-  if (value.length <= 4) {
-    cardInfo.value.cvc = value
-  }
-}
+        // Handle card changes
+        this.cardElement.on("change", (event) => {
+          if (event.error) {
+            this.cardError = event.error.message;
+          } else {
+            this.cardError = "";
+          }
+        });
+      } catch (error) {
+        console.error("Error mounting card element:", error);
+        this.cardError = "Failed to initialize payment form";
+      }
+    },
+
+    selectAmount(amount) {
+      this.selectedAmount = amount;
+      this.useCustomAmount = false;
+      this.customAmount = "";
+    },
+
+    selectCustomAmount() {
+      this.useCustomAmount = true;
+    },
+
+    validateForm() {
+      this.errors = {};
+
+      if (!this.donorInfo.name) this.errors.name = "Name is required";
+      if (!this.donorInfo.email) this.errors.email = "Email is required";
+
+      return Object.keys(this.errors).length === 0;
+    },
+
+    async processPayment() {
+      if (!this.validateForm()) return;
+
+      // Reset previous states
+      this.paymentError = "";
+      this.paymentSuccess = false;
+      this.isLoading = true;
+
+      try {
+        const { token, error } = await this.stripe.createToken(
+          this.cardElement,
+          {
+            name: this.donorInfo.name,
+            email: this.donorInfo.email,
+          }
+        );
+
+        if (error) {
+          console.error("Error creating token:", error);
+          this.cardError = error.message;
+          return;
+        }
+
+        console.log("✅ Stripe Token created:", token);
+
+        // Prepare payment data for backend
+        const paymentData = {
+          campaign_id: this.selectedCampaign,
+          email: this.donorInfo.email,
+          amount: this.finalAmount,
+          charge: {
+            amount: Math.round(this.finalAmount * 100),
+            currency: "sgd",
+            description: `Donation for ${this.campaigns[this.selectedCampaign]?.title || 'Campaign'}`,
+            source: token.id
+          }
+        };
+
+        console.log("Sending payment data:", paymentData);
+
+        // Send to makedonation service
+        const BASE_URL = 'http://127.0.0.1:8086/makedonation';
+        
+        const response = await axios.post(`${BASE_URL}/donate`, paymentData);
+        
+        console.log("Payment response:", response.data);
+        
+        if (response.data && response.data.success) {
+          // Payment successful
+          this.paymentSuccess = true;
+        } else {
+          throw new Error(response.data?.error || "Payment failed");
+        }
+
+        setTimeout(() => {
+          this.resetForm();
+          this.paymentSuccess = false;
+        }, 3000); // Reset after 3 seconds
+
+      } catch (error) {
+        console.error("Payment error:", error);
+        this.paymentError =
+          error.response?.data?.error || "Payment failed. Please try again.";
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async processOneTimePayment() {
+      const paymentData = {
+        amount: this.finalAmount,
+        email: this.donorInfo.email,
+        name: this.donorInfo.name,
+        campaign_id: this.selectedCampaign || null,
+      };
+
+      // For demo purposes, we'll simulate a successful payment
+      console.log("Processing one-time payment:", paymentData);
+
+      // Simulated delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      console.log("✅ Payment processed successfully!");
+    },
+
+    resetForm() {
+      this.donorInfo = {
+        name: "",
+        email: "",
+      };
+      this.selectedAmount = 50;
+      this.customAmount = "";
+      this.useCustomAmount = false;
+      this.errors = {};
+
+      // Reset payment states
+      this.isLoading = false;
+      this.paymentSuccess = false;
+      this.paymentError = "";
+
+      // Clear the Stripe card element
+      if (this.cardElement) {
+        this.cardElement.clear();
+      }
+    },
+
+    formatAmount(amount) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "SGD",
+        minimumFractionDigits: 0,
+      }).format(amount);
+    },
+  },
+};
 </script>
 
 <template>
@@ -286,15 +308,16 @@ function onCvcInput(event) {
   <header class="hero-gradient hero-pattern">
     <div class="container py-20 md:py-28">
       <div class="max-w-4xl mx-auto text-center animate-slide-up">
-        <span class="trust-badge mb-6 inline-block">🔒 Secure Payment Gateway</span>
+        <span class="trust-badge mb-6 inline-block"
+          >🔒 Secure Payment Gateway</span
+        >
         <h1 class="hero-title text-white text-shadow">
           Complete Your <span class="text-gradient">Donation</span>
         </h1>
         <p class="hero-lead mt-4 text-white opacity-95">
-          Choose between a one-time donation or monthly subscription to create lasting impact. 
           Your contribution is secure and 100% goes toward helping children.
         </p>
-        
+
         <div class="social-proof mt-8">
           🛡️ SSL Encrypted • 💳 Stripe Secured • 📧 Instant Receipt
         </div>
@@ -304,58 +327,14 @@ function onCvcInput(event) {
 
   <div class="section-light">
     <div class="container py-16">
-      <!-- PAYMENT TYPE SELECTION -->
-      <section class="mb-12">
-        <div class="max-w-4xl mx-auto">
-          <h2 class="text-center text-slate-900 mb-8">Choose Your Impact Style</h2>
-          
-          <div class="grid md:grid-cols-2 gap-6">
-            <!-- One-time Donation -->
-            <div 
-              class="card p-8 cursor-pointer transition-all duration-300"
-              :class="{ 'ring-4 ring-purple-300 bg-purple-50': paymentType === 'one-time' }"
-              @click="paymentType = 'one-time'"
-            >
-              <div class="text-center">
-                <div class="text-4xl mb-4">💝</div>
-                <h3 class="text-xl font-weight-700 text-slate-900 mb-2">One-Time Donation</h3>
-                <p class="text-slate-600 mb-4">Make an immediate impact with a single contribution</p>
-                
-                <div class="trust-badge" :class="paymentType === 'one-time' ? 'urgent-medium' : ''">
-                  {{ paymentType === 'one-time' ? 'Selected' : 'Choose This' }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Monthly Subscription -->
-            <div 
-              class="card p-8 cursor-pointer transition-all duration-300"
-              :class="{ 'ring-4 ring-purple-300 bg-purple-50': paymentType === 'subscription' }"
-              @click="paymentType = 'subscription'"
-            >
-              <div class="text-center">
-                <div class="text-4xl mb-4">🌟</div>
-                <h3 class="text-xl font-weight-700 text-slate-900 mb-2">Monthly Subscription</h3>
-                <p class="text-slate-600 mb-4">Become a regular supporter with ongoing impact tracking</p>
-                
-                <div class="trust-badge" :class="paymentType === 'subscription' ? 'urgent-medium' : ''">
-                  {{ paymentType === 'subscription' ? 'Selected' : 'Choose This' }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div class="max-w-6xl mx-auto">
         <div class="grid lg:grid-cols-3 gap-8">
           <!-- MAIN PAYMENT FORM -->
           <div class="lg:col-span-2 space-y-8">
-            
-            <!-- AMOUNT/PLAN SELECTION -->
+            <!-- AMOUNT SELECTION -->
             <section class="card p-8">
               <h3 class="text-xl font-weight-700 text-slate-900 mb-6">
-                {{ paymentType === 'subscription' ? 'Choose Your Plan' : 'Select Amount' }}
+                Select Amount
               </h3>
 
               <!-- One-time amounts -->
@@ -364,13 +343,19 @@ function onCvcInput(event) {
                   <button
                     v-for="amount in predefinedAmounts"
                     :key="amount"
-                    @click="selectAmount(amount)"
                     class="amount-btn"
-                    :class="{ 'selected': selectedAmount === amount && !useCustomAmount }"
+                    :class="{
+                      selected: selectedAmount === amount && !useCustomAmount,
+                    }"
                   >
                     {{ formatAmount(amount) }}
                     <div class="progress-mini mt-2">
-                      <div class="progress-fill-mini" :style="{ width: Math.min(amount/250, 1) * 100 + '%' }"></div>
+                      <div
+                        class="progress-fill-mini"
+                        :style="{
+                          width: Math.min(amount / 250, 1) * 100 + '%',
+                        }"
+                      ></div>
                     </div>
                   </button>
                 </div>
@@ -384,170 +369,145 @@ function onCvcInput(event) {
                     placeholder="Custom amount"
                     class="form-input flex-1"
                   />
-                  <span class="text-slate-600">USD</span>
+                  <span class="text-slate-600">SGD</span>
                 </div>
 
                 <div class="impact-highlight">
-                  <strong>{{ formatAmount(finalAmount) }}</strong> can provide 
-                  <strong>{{ Math.round(finalAmount / 2.5) }} learning hours</strong> for children in need.
-                </div>
-              </div>
-
-              <!-- Subscription plans -->
-              <div v-if="paymentType === 'subscription'" class="space-y-6">
-                <div class="grid md:grid-cols-3 gap-6">
-                  <div
-                    v-for="plan in subscriptionPlans"
-                    :key="plan.id"
-                    @click="selectPlan(plan.id)"
-                    class="card p-6 cursor-pointer transition-all duration-300 relative"
-                    :class="{ 
-                      'ring-4 ring-purple-300 bg-purple-50': selectedPlan === plan.id,
-                      'transform scale-105': plan.popular 
-                    }"
+                  <strong>{{ formatAmount(finalAmount) }}</strong> can provide
+                  <strong
+                    >{{ Math.round(finalAmount / 2.5) }} learning hours</strong
                   >
-                    <div v-if="plan.popular" class="trust-badge urgent-high absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      Most Popular
-                    </div>
-                    
-                    <div class="text-center mb-4">
-                      <h4 class="text-lg font-weight-700 text-slate-900">{{ plan.name }}</h4>
-                      <div class="text-3xl font-weight-800 text-slate-900 mt-2">
-                        {{ formatAmount(plan.price) }}
-                        <span class="text-sm text-slate-600 font-weight-500">/month</span>
-                      </div>
-                    </div>
-
-                    <ul class="space-y-2 text-sm">
-                      <li v-for="feature in plan.features" :key="feature" class="flex items-start gap-2">
-                        <span class="text-green-500 mt-1">✓</span>
-                        <span class="text-slate-600">{{ feature }}</span>
-                      </li>
-                    </ul>
-
-                    <div class="mt-6 text-center">
-                      <div class="trust-badge" :class="selectedPlan === plan.id ? 'urgent-medium' : ''">
-                        {{ selectedPlan === plan.id ? 'Selected' : 'Choose Plan' }}
-                      </div>
-                    </div>
-                  </div>
+                  for children in need.
                 </div>
               </div>
             </section>
 
-            <!-- CAMPAIGN SELECTION (Optional) -->
+            <!-- CAMPAIGN DETAILS -->
             <section class="card p-8">
-              <h3 class="text-xl font-weight-700 text-slate-900 mb-4">
-                Support a Specific Campaign (Optional)
+              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">
+                Campaign Details
               </h3>
-              <p class="text-slate-600 mb-6">Choose a campaign to direct your donation, or leave unselected for general support.</p>
-              
-              <div class="grid md:grid-cols-3 gap-4">
-                <div
-                  v-for="campaign in campaigns"
-                  :key="campaign.id"
-                  @click="selectedCampaign = selectedCampaign === campaign.id ? null : campaign.id"
-                  class="story-card cursor-pointer transition-all duration-300"
-                  :class="{ 'ring-2 ring-purple-400': selectedCampaign === campaign.id }"
-                >
-                  <img :src="campaign.image" :alt="campaign.title" class="w-full h-32 object-cover" />
-                  <div class="p-4">
-                    <h4 class="font-weight-600 text-slate-900 text-sm mb-1">{{ campaign.title }}</h4>
-                    <p class="text-xs text-slate-600">{{ campaign.description }}</p>
+
+              <div
+                v-if="campaigns.length > 0"
+                class="flex gap-6 p-4 border-2 border-slate-200 rounded-lg bg-slate-50"
+              >
+                <!-- Campaign Image -->
+                <div class="flex-shrink-0">
+                  <img
+                    :src="campaigns[0].image"
+                    :alt="campaigns[0].title"
+                    class="w-24 h-24 object-cover rounded-lg"
+                  />
+                </div>
+
+                <!-- Campaign Info -->
+                <div class="flex-1">
+                  <h4 class="font-weight-700 text-slate-900 text-lg mb-2">
+                    {{ campaigns[0].title }}
+                  </h4>
+                  <p class="text-slate-600 text-sm leading-relaxed">
+                    {{ campaigns[0].description }}
+                  </p>
+                  <div class="mt-3">
+                    <span
+                      class="inline-block bg-purple-100 text-purple-700 text-xs px-3 py-1 rounded-full"
+                    >
+                      Your donation will support this campaign
+                    </span>
                   </div>
                 </div>
               </div>
-            </section>
 
-            <!-- DONOR INFORMATION -->
-            <section class="card p-8">
-              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">Your Information</h3>
-              
-              <div class="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label class="block text-sm font-weight-600 text-slate-900 mb-2">Full Name *</label>
-                  <input
-                    v-model="donorInfo.name"
-                    type="text"
-                    class="form-input w-full"
-                    :class="{ 'border-red-500': errors.name }"
-                    placeholder="John Doe"
-                  />
-                  <p v-if="errors.name" class="text-red-500 text-sm mt-1">{{ errors.name }}</p>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-weight-600 text-slate-900 mb-2">Email Address *</label>
-                  <input
-                    v-model="donorInfo.email"
-                    type="email"
-                    class="form-input w-full"
-                    :class="{ 'border-red-500': errors.email }"
-                    placeholder="john@example.com"
-                  />
-                  <p v-if="errors.email" class="text-red-500 text-sm mt-1">{{ errors.email }}</p>
-                </div>
+              <!-- Fallback if no campaigns -->
+              <div v-else class="text-center p-8 text-slate-600">
+                <p>Loading campaign details...</p>
               </div>
             </section>
 
-            <!-- PAYMENT METHOD -->
+            <!-- DONOR INFORMATION & PAYMENT METHOD -->
             <section class="card p-8">
-              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">Payment Method</h3>
-              
-              <div class="space-y-6">
-                <!-- Payment method info -->
-                <div class="card p-4 mb-4">
-                  <div class="flex items-center justify-center gap-3">
-                    <span class="text-2xl">💳</span>
+              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">
+                Your Information & Payment
+              </h3>
+
+              <div class="grid md:grid-cols-2 gap-8">
+                <!-- Left Side: Donor Information -->
+                <div>
+                  <h4 class="text-lg font-weight-600 text-slate-900 mb-4">
+                    Personal Details
+                  </h4>
+
+                  <div class="space-y-6">
                     <div>
-                      <div class="font-weight-600 text-slate-900">Secure Card Payment</div>
-                      <div class="text-sm text-slate-600">Powered by Stripe • SSL Encrypted</div>
+                      <label
+                        class="block text-sm font-weight-600 text-slate-900 mb-2"
+                        >Full Name *</label
+                      >
+                      <input
+                        v-model="donorInfo.name"
+                        type="text"
+                        class="form-input w-full"
+                        :class="{ 'border-red-500': errors.name }"
+                        placeholder="John Doe"
+                      />
+                      <p v-if="errors.name" class="text-red-500 text-sm mt-1">
+                        {{ errors.name }}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label
+                        class="block text-sm font-weight-600 text-slate-900 mb-2"
+                        >Email Address *</label
+                      >
+                      <input
+                        v-model="donorInfo.email"
+                        type="email"
+                        class="form-input w-full"
+                        :class="{ 'border-red-500': errors.email }"
+                        placeholder="john@example.com"
+                      />
+                      <p v-if="errors.email" class="text-red-500 text-sm mt-1">
+                        {{ errors.email }}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                <!-- Card form -->
-                <div class="grid md:grid-cols-2 gap-6">
-                  <div class="md:col-span-2">
-                    <label class="block text-sm font-weight-600 text-slate-900 mb-2">Card Number *</label>
-                    <input
-                      :value="cardInfo.number"
-                      @input="onCardNumberInput"
-                      type="text"
-                      class="form-input w-full"
-                      :class="{ 'border-red-500': errors.cardNumber }"
-                      placeholder="1234 5678 9012 3456"
-                      maxlength="19"
-                    />
-                    <p v-if="errors.cardNumber" class="text-red-500 text-sm mt-1">{{ errors.cardNumber }}</p>
-                  </div>
+                <!-- Right Side: Payment Method -->
+                <div>
+                  <h4 class="text-lg font-weight-600 text-slate-900 mb-4">
+                    Payment Method
+                  </h4>
 
-                  <div>
-                    <label class="block text-sm font-weight-600 text-slate-900 mb-2">Expiry Date *</label>
-                    <input
-                      :value="cardInfo.expiry"
-                      @input="onExpiryInput"
-                      type="text"
-                      class="form-input w-full"
-                      :class="{ 'border-red-500': errors.expiry }"
-                      placeholder="MM/YY"
-                      maxlength="5"
-                    />
-                    <p v-if="errors.expiry" class="text-red-500 text-sm mt-1">{{ errors.expiry }}</p>
-                  </div>
+                  <div class="space-y-6">
+                    <!-- Card form with Stripe Elements -->
+                    <div>
+                      <label
+                        class="block text-sm font-weight-600 text-slate-900 mb-2"
+                        >Card Information *</label
+                      >
+                      <!-- Stripe Elements will be mounted here -->
+                      <div class="form-group">
+                        <label>Card Information</label>
+                        <div id="card-element" class="card-element"></div>
+                        <div v-if="cardError" class="error">
+                          {{ cardError }}
+                        </div>
+                      </div>
+                      <!-- Display form errors -->
+                      <div
+                        id="card-errors"
+                        class="text-red-500 text-sm mt-1"
+                        role="alert"
+                      ></div>
 
-                  <div>
-                    <label class="block text-sm font-weight-600 text-slate-900 mb-2">CVC *</label>
-                    <input
-                      :value="cardInfo.cvc"
-                      @input="onCvcInput"
-                      type="text"
-                      class="form-input w-full"
-                      :class="{ 'border-red-500': errors.cvc }"
-                      placeholder="123"
-                      maxlength="4"
-                    />
-                    <p v-if="errors.cvc" class="text-red-500 text-sm mt-1">{{ errors.cvc }}</p>
+                      <!-- Debug info (remove in production) -->
+                      <div class="text-xs text-slate-400 mt-1">
+                        Card element container ready for Stripe mounting
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -557,58 +517,80 @@ function onCvcInput(event) {
           <!-- PAYMENT SUMMARY SIDEBAR -->
           <div class="lg:col-span-1">
             <div class="card p-8 sticky top-8">
-              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">Payment Summary</h3>
-              
+              <h3 class="text-xl font-weight-700 text-slate-900 mb-6">
+                Payment Summary
+              </h3>
+
               <div class="space-y-4">
                 <div class="flex justify-between items-center">
                   <span class="text-slate-600">Type:</span>
                   <span class="font-weight-600 text-slate-900">
-                    {{ paymentType === 'subscription' ? 'Monthly Subscription' : 'One-time Donation' }}
+                    {{
+                      paymentType === "subscription"
+                        ? "Monthly Subscription"
+                        : "One-time Donation"
+                    }}
                   </span>
                 </div>
 
-                <div v-if="paymentType === 'subscription'" class="flex justify-between items-center">
+                <div
+                  v-if="paymentType === 'subscription'"
+                  class="flex justify-between items-center"
+                >
                   <span class="text-slate-600">Plan:</span>
                   <span class="font-weight-600 text-slate-900">
-                    {{ subscriptionPlans.find(p => p.id === selectedPlan)?.name }}
+                    {{
+                      subscriptionPlans.find((p) => p.id === selectedPlan)?.name
+                    }}
                   </span>
                 </div>
 
-                <div v-if="selectedCampaign" class="flex justify-between items-center">
-                  <span class="text-slate-600">Campaign:</span>
-                  <span class="font-weight-600 text-slate-900 text-sm">
-                    {{ campaigns.find(c => c.id === selectedCampaign)?.title }}
-                  </span>
-                </div>
-
-                <hr class="border-slate-200">
+                <hr class="border-slate-200" />
 
                 <div class="flex justify-between items-center">
-                  <span class="text-lg font-weight-600 text-slate-900">Total:</span>
+                  <span class="text-lg font-weight-600 text-slate-900"
+                    >Total:</span
+                  >
                   <span class="text-2xl font-weight-800 text-slate-900">
                     {{ formatAmount(finalAmount) }}
-                    <span v-if="paymentType === 'subscription'" class="text-sm font-weight-500 text-slate-600">/month</span>
+                    <span
+                      v-if="paymentType === 'subscription'"
+                      class="text-sm font-weight-500 text-slate-600"
+                      >/month</span
+                    >
                   </span>
                 </div>
 
                 <div class="impact-highlight">
                   <div class="text-center">
-                    <div class="font-weight-600 text-slate-900 mb-2">Your Impact</div>
+                    <div class="font-weight-600 text-slate-900 mb-2">
+                      Your Impact
+                    </div>
                     <div class="text-sm text-slate-600">
-                      {{ paymentType === 'subscription' ? 'Monthly' : 'One-time' }} support of 
-                      <strong>{{ Math.round(finalAmount / 2.5) }} learning hours</strong>
+                      {{
+                        paymentType === "subscription" ? "Monthly" : "One-time"
+                      }}
+                      support of
+                      <strong
+                        >{{ Math.round(finalAmount / 2.5) }} learning
+                        hours</strong
+                      >
                     </div>
                   </div>
                 </div>
 
                 <!-- Error Message -->
-                <div v-if="paymentError" class="card p-6 mb-4" style="border-left: 4px solid #dc2626;">
+                <div
+                  v-if="paymentError"
+                  class="card p-6 mb-4"
+                  style="border-left: 4px solid #dc2626"
+                >
                   <div class="flex items-center gap-4">
-                    <div class="trust-badge urgent-high">
-                      ❌ Failed
-                    </div>
+                    <div class="trust-badge urgent-high">❌ Failed</div>
                     <div>
-                      <h4 class="font-weight-700 text-slate-900 mb-1">Payment Failed</h4>
+                      <h4 class="font-weight-700 text-slate-900 mb-1">
+                        Payment Failed
+                      </h4>
                       <p class="text-slate-600 text-sm">{{ paymentError }}</p>
                     </div>
                   </div>
@@ -617,14 +599,19 @@ function onCvcInput(event) {
                 <!-- Success Message -->
                 <div v-if="paymentSuccess" class="impact-highlight mb-4">
                   <div class="flex items-center gap-4">
-                    <div class="trust-badge urgent-low">
-                      ✅ Success
-                    </div>
+                    <div class="trust-badge urgent-low">✅ Success</div>
                     <div>
-                      <div class="font-weight-700 text-slate-900 mb-1">Payment Successful!</div>
+                      <div class="font-weight-700 text-slate-900 mb-1">
+                        Payment Successful!
+                      </div>
                       <div class="text-slate-600 text-sm">
-                        {{ paymentType === 'subscription' ? 'Subscription' : 'Donation' }} of 
-                        <strong>{{ formatAmount(finalAmount) }}</strong> has been processed successfully.
+                        {{
+                          paymentType === "subscription"
+                            ? "Subscription"
+                            : "Donation"
+                        }}
+                        of <strong>{{ formatAmount(finalAmount) }}</strong> has
+                        been processed successfully.
                       </div>
                     </div>
                   </div>
@@ -636,23 +623,51 @@ function onCvcInput(event) {
                   :class="{ 'opacity-50 cursor-not-allowed': !isFormValid }"
                   :disabled="!isFormValid"
                 >
-                  <span v-if="isLoading" class="flex items-center justify-center">
-                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <span
+                    v-if="isLoading"
+                    class="flex items-center justify-center"
+                  >
+                    <svg
+                      class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      ></circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     Processing...
                   </span>
                   <span v-else>
-                    {{ paymentType === 'subscription' ? 'Start Subscription' : 'Complete Donation' }}
+                    {{
+                      paymentType === "subscription"
+                        ? "Start Subscription"
+                        : "Complete Donation"
+                    }}
                   </span>
                 </button>
 
                 <div class="text-center">
                   <div class="trust-badge mb-3">🔒 Secure Payment</div>
                   <p class="text-xs text-slate-600 leading-relaxed">
-                    Your payment is processed securely by Stripe. We never store your card details.
-                    {{ paymentType === 'subscription' ? 'You can cancel your subscription anytime.' : '' }}
+                    Your payment is processed securely by Stripe. We never store
+                    your card details.
+                    {{
+                      paymentType === "subscription"
+                        ? "You can cancel your subscription anytime."
+                        : ""
+                    }}
                   </p>
                 </div>
               </div>
@@ -668,30 +683,38 @@ function onCvcInput(event) {
     <div class="container py-16">
       <div class="text-center">
         <h2 class="text-slate-900 mb-8">Why Your Payment is Safe</h2>
-        
+
         <div class="grid md:grid-cols-4 gap-6">
           <div class="card p-6 text-center">
             <div class="text-3xl mb-4">🔒</div>
             <h3 class="font-weight-600 text-slate-900 mb-2">SSL Encrypted</h3>
-            <p class="text-sm text-slate-600">Bank-level security for all transactions</p>
+            <p class="text-sm text-slate-600">
+              Bank-level security for all transactions
+            </p>
           </div>
-          
+
           <div class="card p-6 text-center">
             <div class="text-3xl mb-4">💳</div>
             <h3 class="font-weight-600 text-slate-900 mb-2">Stripe Powered</h3>
             <p class="text-sm text-slate-600">Trusted by millions worldwide</p>
           </div>
-          
+
           <div class="card p-6 text-center">
             <div class="text-3xl mb-4">📧</div>
             <h3 class="font-weight-600 text-slate-900 mb-2">Instant Receipt</h3>
-            <p class="text-sm text-slate-600">Immediate confirmation and tax receipt</p>
+            <p class="text-sm text-slate-600">
+              Immediate confirmation and tax receipt
+            </p>
           </div>
-          
+
           <div class="card p-6 text-center">
             <div class="text-3xl mb-4">🛡️</div>
-            <h3 class="font-weight-600 text-slate-900 mb-2">Privacy Protected</h3>
-            <p class="text-sm text-slate-600">Your data is never shared or sold</p>
+            <h3 class="font-weight-600 text-slate-900 mb-2">
+              Privacy Protected
+            </h3>
+            <p class="text-sm text-slate-600">
+              Your data is never shared or sold
+            </p>
           </div>
         </div>
       </div>

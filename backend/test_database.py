@@ -71,7 +71,6 @@ def test_sample_campaign():
                 "description": "Campaign for testing payment functionality", 
                 "status": "active",
                 "goal_amount": 1000.00,
-                "current_amount": 0.00,
                 "end_date": "2024-12-31"
             }
             

@@ -79,6 +79,14 @@ def delete_donor(donor_id):
     else:
         return jsonify({"status": "error", "message": "Failed to delete donor"}), 400
 
+@donor_blueprint.route('/<string:email>', methods=['GET'])
+def get_donor_by_email(email):
+    response = supabase.table("Donors").select("*").eq("email", email).execute()
+    if response.data:
+        return jsonify({"status": "success", "data": response.data}), 200
+    else:
+        return jsonify({"status": "error", "message": "Donor not found"}), 404
+
 app.register_blueprint(donor_blueprint, url_prefix='/donor')
 
 if __name__ == '__main__':

@@ -6,6 +6,8 @@ Run this to make sure your .env file is configured correctly
 
 import os
 from dotenv import load_dotenv
+import stripe
+from supabase import create_client
 
 # Load environment variables
 load_dotenv()
@@ -42,7 +44,6 @@ def test_stripe_connection():
     print("💳 Testing Stripe Connection...")
     
     try:
-        import stripe
         stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
         
         # Test with a simple API call
@@ -68,8 +69,6 @@ def test_supabase_connection():
     print("\n🗄️  Testing Supabase Connection...")
     
     try:
-        from supabase import create_client
-        
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
         
