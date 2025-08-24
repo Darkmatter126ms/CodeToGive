@@ -9,17 +9,13 @@ const API_BASE_URL = 'http://localhost:8080/campaign'
 
 // Stock photos pool for campaign images (fallback for display)
 const stockPhotos = [
-  "https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=80&w=1600", // School building
-  "https://images.unsplash.com/photo-1580582932707-520aed937b7b?q=80&w=1600", // Students studying
-  "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=1600", // Classroom tech
-  "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?q=80&w=1600", // School playground
-  "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1600", // School supplies
-  "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=1600", // Students reading
-  "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=1600", // School library
-  "https://images.unsplash.com/photo-1588072432836-e10032774350?q=80&w=1600", // School cafeteria
-  "https://images.unsplash.com/photo-1498721406610-899c1d4eb77d?q=80&w=1600", // School meals
-  "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=1600", // Mental health
-  "https://images.unsplash.com/photo-1541919329513-35f7af297129?q=80&w=1600", // Clean water
+  "https://media.istockphoto.com/id/497000834/photo/little-asian-boy.jpg?s=612x612&w=0&k=20&c=bMs3BE39UAVO-ocjTfvLKD8Aq2YEM6TB2cH3xPUS_JM=", // School building
+  "https://media.istockphoto.com/id/1437682932/photo/a-close-up-of-a-young-boy-smiling-at-the-park.jpg?s=612x612&w=0&k=20&c=_qh6OfA_9i7Udj-2LcXlLtSuht8E9HYNdT7WEVdqHq8=", // Students studying
+  "https://thumbs.dreamstime.com/b/cute-asian-kids-5233885.jpg", // Classroom tech
+  "https://st2.depositphotos.com/1930953/7447/i/950/depositphotos_74478231-stock-photo-asian-children-playing-with-magnifier.jpg", // School playground
+  "https://plus.unsplash.com/premium_photo-1682095589825-d43015141de6?fm=jpg&q=60&w=3000&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDMwfHx8ZW58MHx8fHx8", // School supplies
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSVtBOBTckxEHHy7GzECapZp75njAzSUfUtBw&s", // Students reading
+  "https://imageio.forbes.com/specials-images/imageserve/644955ee63363c62512a02d3/0x0.jpg?format=jpg&height=600&width=1200&fit=bounds", // School library
 ]
 
 // Region mapping for Hong Kong districts
@@ -229,7 +225,10 @@ onMounted(() => {
   </div>
 
   <!-- HERO -->
-  <header class="hero-gradient hero-pattern">
+  <header
+    class="hero-photo tint-dark text-white"
+    style="--hero-bg:url('https://reach.org.hk/_assets/media/bccd049f097f1b6c3fa333cefd16ff30.jpg')"
+>
     <div class="container py-20 md:py-28 text-center">
       <span class="trust-badge mb-6 inline-block">Live Campaigns</span>
       <h1 class="hero-title text-white animate-slide-up">

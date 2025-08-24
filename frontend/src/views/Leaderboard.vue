@@ -192,7 +192,10 @@ onMounted(fetchAll)
 
 <template>
   <!-- HERO -->
-  <header class="hero-gradient hero-pattern">
+    <header
+    class="hero-photo tint-dark text-white"
+    style="--hero-bg:url('https://media.istockphoto.com/id/497000834/photo/little-asian-boy.jpg?s=612x612&w=0&k=20&c=bMs3BE39UAVO-ocjTfvLKD8Aq2YEM6TB2cH3xPUS_JM=')"
+    >
     <div class="container py-16 md:py-20 text-center">
       <span class="trust-badge mb-4 inline-block">Donor Leaderboard</span>
       <h1 class="hero-title text-white text-shadow">Top <span class="text-gradient">Contributors</span></h1>

@@ -62,7 +62,7 @@ function donate(){
         <div class="grid gap-6 animate-slide-right">
           <article class="story-card">
             <img alt="Children in classroom learning English" class="w-full h-44 object-cover"
-                 src="https://images.unsplash.com/photo-1497486751825-1233686d5d80?q=80&w=1600" />
+                 src="https://imageio.forbes.com/specials-images/imageserve/644955ee63363c62512a02d3/0x0.jpg?format=jpg&height=600&width=1200&fit=bounds" />
             <div class="p-6">
               <h3>K3 Bridge Program</h3>
               <p>Weekly 45-60 minute sessions with proprietary curriculum and learning app assessments.</p>
@@ -70,7 +70,7 @@ function donate(){
           </article>
           <article class="story-card">
             <img alt="Parents helping children with homework" class="w-full h-44 object-cover"
-                 src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1600" />
+                 src="https://media.istockphoto.com/id/1437682932/photo/a-close-up-of-a-young-boy-smiling-at-the-park.jpg?s=612x612&w=0&k=20&c=_qh6OfA_9i7Udj-2LcXlLtSuht8E9HYNdT7WEVdqHq8=" />
             <div class="p-6">
               <h3>Parent Support</h3>
               <p>Home learning materials with video instructions to extend classroom impact.</p>
