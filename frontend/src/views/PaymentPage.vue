@@ -356,6 +356,7 @@ export default {
                   <button
                     v-for="amount in predefinedAmounts"
                     :key="amount"
+                    @click="selectAmount(amount)"
                     class="amount-btn"
                     :class="{
                       selected: selectedAmount === amount && !useCustomAmount,
