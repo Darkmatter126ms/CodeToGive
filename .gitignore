@@ -31,3 +31,5 @@ coverage
 
 # Env File
 .env
+
+./backend/venv
