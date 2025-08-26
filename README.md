@@ -12,7 +12,7 @@ How might we transform one-time donors into engaged community champions through 
 
 ## Links
 
-[Project REACH website]((https://reach.org.hk/))  
+[Project REACH website](https://reach.org.hk/)  
 ## Team Members
 | Team Member | Email |
 | ------------- | ------------- |
